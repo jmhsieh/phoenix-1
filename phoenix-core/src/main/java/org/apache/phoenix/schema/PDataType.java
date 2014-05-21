@@ -29,8 +29,8 @@ import java.text.Format;
 import java.util.Map;
 
 import org.apache.hadoop.hbase.io.ImmutableBytesWritable;
-import org.apache.hadoop.hbase.util.Base64;
-import org.apache.hadoop.hbase.util.Bytes;
+import org.apache.hadoop.hbase.types.OrderedInt64;
+import org.apache.hadoop.hbase.util.*;
 import org.apache.phoenix.exception.ValueTypeIncompatibleException;
 import org.apache.phoenix.query.KeyRange;
 import org.apache.phoenix.query.QueryConstants;
@@ -328,7 +328,188 @@ public enum PDataType {
             return VARCHAR.toStringLiteral(b, offset, length, formatter);
         }
     },
-    LONG("BIGINT", Types.BIGINT, Long.class, new LongCodec()) {
+//    LONG("BIGINT", Types.BIGINT, Long.class, new LongCodec()) {
+//        @Override
+//        public Integer getScale(Object o) {
+//            return ZERO;
+//        }
+//
+//        @Override
+//        public byte[] toBytes(Object object) {
+//            byte[] b = new byte[Bytes.SIZEOF_LONG];
+//            toBytes(object, b, 0);
+//            return b;
+//        }
+//
+//        @Override
+//        public int toBytes(Object object, byte[] b, int o) {
+//            if (object == null) {
+//                throw new ConstraintViolationException(this + " may not be null");
+//            }
+//            return this.getCodec().encodeLong(((Number)object).longValue(), b, o);
+//        }
+//
+//        @Override
+//        public Object toObject(Object object, PDataType actualType) {
+//            if (object == null) {
+//                return null;
+//            }
+//            switch (actualType) {
+//            case LONG:
+//            case UNSIGNED_LONG:
+//                return object;
+//            case UNSIGNED_INT:
+//            case INTEGER:
+//                long s = (Integer)object;
+//                return s;
+//            case TINYINT:
+//            case UNSIGNED_TINYINT:
+//                s = (Byte)object;
+//                return s;
+//            case SMALLINT:
+//            case UNSIGNED_SMALLINT:
+//                s = (Short)object;
+//                return s;
+//            case FLOAT:
+//            case UNSIGNED_FLOAT:
+//                Float f = (Float)object;
+//                if (f > Long.MAX_VALUE || f < Long.MIN_VALUE) {
+//                    throw new IllegalDataException(actualType + " value " + f + " cannot be cast to Long without changing its value");
+//                }
+//                s = f.longValue();
+//                return s;
+//            case DOUBLE:
+//            case UNSIGNED_DOUBLE:
+//                Double de = (Double) object;
+//                if (de > Long.MAX_VALUE || de < Long.MIN_VALUE) {
+//                    throw new IllegalDataException(actualType + " value " + de + " cannot be cast to Long without changing its value");
+//                }
+//                s = de.longValue();
+//                return s;
+//            case DECIMAL:
+//                BigDecimal d = (BigDecimal)object;
+//                return d.longValueExact();
+//            default:
+//                return throwConstraintViolationException(actualType,this);
+//            }
+//        }
+//
+//        @Override
+//        public Long toObject(byte[] b, int o, int l, PDataType actualType, SortOrder sortOrder, Integer maxLength, Integer scale) {
+//            if (l == 0) {
+//                return null;
+//            }
+//            switch (actualType) {
+//            case LONG:
+//            case UNSIGNED_LONG:
+//            case INTEGER:
+//            case UNSIGNED_INT:
+//            case SMALLINT:
+//            case UNSIGNED_SMALLINT:
+//            case TINYINT:
+//            case UNSIGNED_TINYINT:
+//            case FLOAT:
+//            case UNSIGNED_FLOAT:
+//            case DOUBLE:
+//            case UNSIGNED_DOUBLE:
+//                return actualType.getCodec().decodeLong(b, o, sortOrder);
+//            case DECIMAL:
+//                BigDecimal bd = (BigDecimal)actualType.toObject(b, o, l, actualType, sortOrder);
+//                return bd.longValueExact();
+//            }
+//            throwConstraintViolationException(actualType,this);
+//            return null;
+//        }
+//
+//        @Override
+//        public boolean isCoercibleTo(PDataType targetType) {
+//            // In general, don't allow conversion of LONG to INTEGER. There are times when
+//            // we check isComparableTo for a more relaxed check and then throw a runtime
+//            // exception if we overflow
+//            return this == targetType || targetType == DECIMAL
+//                    || targetType == VARBINARY || targetType == BINARY
+//                    || targetType == DOUBLE;
+//        }
+//
+//        @Override
+//        public boolean isComparableTo(PDataType targetType) {
+//            return DECIMAL.isComparableTo(targetType);
+//        }
+//
+//        @Override
+//        public boolean isCoercibleTo(PDataType targetType, Object value) {
+//            if (value != null) {
+//                long l;
+//                switch (targetType) {
+//                    case UNSIGNED_DOUBLE:
+//                    case UNSIGNED_FLOAT:
+//                    case UNSIGNED_LONG:
+//                        l = (Long) value;
+//                        return l >= 0;
+//                    case UNSIGNED_INT:
+//                        l = (Long) value;
+//                        return (l >= 0 && l <= Integer.MAX_VALUE);
+//                    case INTEGER:
+//                        l = (Long) value;
+//                        return (l >= Integer.MIN_VALUE && l <= Integer.MAX_VALUE);
+//                    case UNSIGNED_SMALLINT:
+//                        l = (Long) value;
+//                        return (l >= 0 && l <= Short.MAX_VALUE);
+//                    case SMALLINT:
+//                        l = (Long) value;
+//                        return (l >=Short.MIN_VALUE && l<=Short.MAX_VALUE);
+//                    case TINYINT:
+//                        l = (Long)value;
+//                        return (l >=Byte.MIN_VALUE && l<Byte.MAX_VALUE);
+//                    case UNSIGNED_TINYINT:
+//                        l = (Long)value;
+//                        return (l >=0 && l<Byte.MAX_VALUE);
+//                    default:
+//                        break;
+//                }
+//            }
+//            return super.isCoercibleTo(targetType, value);
+//        }
+//
+//        @Override
+//        public boolean isFixedWidth() {
+//            return true;
+//        }
+//
+//        @Override
+//        public Integer getByteSize() {
+//            return Bytes.SIZEOF_LONG;
+//        }
+//
+//        @Override
+//        public Integer getMaxLength(Object o) {
+//            return LONG_PRECISION;
+//        }
+//
+//        @Override
+//        public int compareTo(Object lhs, Object rhs, PDataType rhsType) {
+//            if (rhsType == DECIMAL) {
+//                return -((BigDecimal)rhs).compareTo(BigDecimal.valueOf(((Number)lhs).longValue()));
+//            } else if (rhsType == DOUBLE || rhsType == FLOAT || rhsType == UNSIGNED_DOUBLE || rhsType == UNSIGNED_FLOAT) {
+//                return Doubles.compare(((Number)lhs).doubleValue(), ((Number)rhs).doubleValue());
+//            }
+//            return Longs.compare(((Number)lhs).longValue(), ((Number)rhs).longValue());
+//        }
+//
+//        @Override
+//        public Object toObject(String value) {
+//            if (value == null || value.length() == 0) {
+//                return null;
+//            }
+//            try {
+//                return Long.parseLong(value);
+//            } catch (NumberFormatException e) {
+//                throw new IllegalDataException(e);
+//            }
+//        }
+//    },
+    // First attempt to string through hbase's o.a.h.h.types data types.
+    LONG("BIGINT", Types.BIGINT, Long.class, new DTLongCodec()) {
         @Override
         public Integer getScale(Object o) {
             return ZERO;
@@ -336,7 +517,8 @@ public enum PDataType {
 
         @Override
         public byte[] toBytes(Object object) {
-            byte[] b = new byte[Bytes.SIZEOF_LONG];
+            // data + tag
+            byte[] b = new byte[Bytes.SIZEOF_LONG + 1];
             toBytes(object, b, 0);
             return b;
         }
@@ -355,42 +537,42 @@ public enum PDataType {
                 return null;
             }
             switch (actualType) {
-            case LONG:
-            case UNSIGNED_LONG:
-                return object;
-            case UNSIGNED_INT:
-            case INTEGER:
-                long s = (Integer)object;
-                return s;
-            case TINYINT:
-            case UNSIGNED_TINYINT:
-                s = (Byte)object;
-                return s;
-            case SMALLINT:
-            case UNSIGNED_SMALLINT:
-                s = (Short)object;
-                return s;
-            case FLOAT:
-            case UNSIGNED_FLOAT:
-                Float f = (Float)object;
-                if (f > Long.MAX_VALUE || f < Long.MIN_VALUE) {
-                    throw new IllegalDataException(actualType + " value " + f + " cannot be cast to Long without changing its value");
-                }
-                s = f.longValue();
-                return s;
-            case DOUBLE:
-            case UNSIGNED_DOUBLE:
-                Double de = (Double) object;
-                if (de > Long.MAX_VALUE || de < Long.MIN_VALUE) {
-                    throw new IllegalDataException(actualType + " value " + de + " cannot be cast to Long without changing its value");
-                }
-                s = de.longValue();
-                return s;
-            case DECIMAL:
-                BigDecimal d = (BigDecimal)object;
-                return d.longValueExact();
-            default:
-                return throwConstraintViolationException(actualType,this);
+                case LONG:
+                case UNSIGNED_LONG:
+                    return object;
+                case UNSIGNED_INT:
+                case INTEGER:
+                    long s = (Integer)object;
+                    return s;
+                case TINYINT:
+                case UNSIGNED_TINYINT:
+                    s = (Byte)object;
+                    return s;
+                case SMALLINT:
+                case UNSIGNED_SMALLINT:
+                    s = (Short)object;
+                    return s;
+                case FLOAT:
+                case UNSIGNED_FLOAT:
+                    Float f = (Float)object;
+                    if (f > Long.MAX_VALUE || f < Long.MIN_VALUE) {
+                        throw new IllegalDataException(actualType + " value " + f + " cannot be cast to Long without changing its value");
+                    }
+                    s = f.longValue();
+                    return s;
+                case DOUBLE:
+                case UNSIGNED_DOUBLE:
+                    Double de = (Double) object;
+                    if (de > Long.MAX_VALUE || de < Long.MIN_VALUE) {
+                        throw new IllegalDataException(actualType + " value " + de + " cannot be cast to Long without changing its value");
+                    }
+                    s = de.longValue();
+                    return s;
+                case DECIMAL:
+                    BigDecimal d = (BigDecimal)object;
+                    return d.longValueExact();
+                default:
+                    return throwConstraintViolationException(actualType,this);
             }
         }
 
@@ -400,22 +582,22 @@ public enum PDataType {
                 return null;
             }
             switch (actualType) {
-            case LONG:
-            case UNSIGNED_LONG:
-            case INTEGER:
-            case UNSIGNED_INT:
-            case SMALLINT:
-            case UNSIGNED_SMALLINT:
-            case TINYINT:
-            case UNSIGNED_TINYINT:
-            case FLOAT:
-            case UNSIGNED_FLOAT:
-            case DOUBLE:
-            case UNSIGNED_DOUBLE:
-                return actualType.getCodec().decodeLong(b, o, sortOrder);
-            case DECIMAL:
-                BigDecimal bd = (BigDecimal)actualType.toObject(b, o, l, actualType, sortOrder);
-                return bd.longValueExact();
+                case LONG:
+                case UNSIGNED_LONG:
+                case INTEGER:
+                case UNSIGNED_INT:
+                case SMALLINT:
+                case UNSIGNED_SMALLINT:
+                case TINYINT:
+                case UNSIGNED_TINYINT:
+                case FLOAT:
+                case UNSIGNED_FLOAT:
+                case DOUBLE:
+                case UNSIGNED_DOUBLE:
+                    return actualType.getCodec().decodeLong(b, o, sortOrder);
+                case DECIMAL:
+                    BigDecimal bd = (BigDecimal)actualType.toObject(b, o, l, actualType, sortOrder);
+                    return bd.longValueExact();
             }
             throwConstraintViolationException(actualType,this);
             return null;
@@ -478,7 +660,8 @@ public enum PDataType {
 
         @Override
         public Integer getByteSize() {
-            return Bytes.SIZEOF_LONG;
+            // data + tag byte.
+            return Bytes.SIZEOF_LONG + 1;
         }
 
         @Override
@@ -1555,7 +1738,7 @@ public enum PDataType {
                 Integer maxLength, Integer scale, SortOrder actualModifier,
                 Integer desiredMaxLength, Integer desiredScale, SortOrder expectedModifier) {
             if (desiredScale == null) {
-                // deiredScale not available, or we do not have scale requirement, delegate to parents.
+                // desiredScale not available, or we do not have scale requirement, delegate to parents.
                 super.coerceBytes(ptr, object, actualType, maxLength, scale, actualModifier, desiredMaxLength, desiredScale, expectedModifier);
                 return;
             }
@@ -5560,6 +5743,109 @@ public enum PDataType {
         @Override
         public int encodeDouble(double v, byte[] b, int o) {
             throw new UnsupportedOperationException();
+        }
+    }
+
+    public static class DTLongCodec extends BaseCodec {
+
+        OrderedInt64 codec = OrderedInt64.ASCENDING;
+
+        private DTLongCodec() {
+        }
+
+        @Override
+        public float decodeFloat(byte[] b, int o, SortOrder sortOrder) {
+            return decodeLong(b, o, sortOrder);
+        }
+
+        @Override
+        public double decodeDouble(byte[] b, int o, SortOrder sortOrder) {
+            return decodeLong(b, o, sortOrder);
+        }
+
+        @Override
+        public long decodeLong(byte[] bytes, int o, SortOrder sortOrder) {
+            Preconditions.checkNotNull(sortOrder);
+            long v;
+            PositionedByteRange buf = new SimplePositionedByteRange(bytes, o, bytes.length-o);
+            if (sortOrder == SortOrder.ASC) {
+                v = OrderedInt64.ASCENDING.decode(buf);
+            } else {
+                v = OrderedInt64.DESCENDING.decode(buf);
+            }
+            return v;
+        }
+
+
+        @Override
+        public int decodeInt(byte[] b, int o, SortOrder sortOrder) {
+            long v = decodeLong(b, o, sortOrder);
+            if (v < Integer.MIN_VALUE || v > Integer.MAX_VALUE) {
+                throw new IllegalDataException("Value " + v + " cannot be cast to Integer without changing its value");
+            }
+            return (int)v;
+        }
+
+        @Override
+        public int encodeFloat(float v, byte[] b, int o) {
+            if (v < Long.MIN_VALUE || v > Long.MAX_VALUE) {
+                throw new IllegalDataException("Value " + v + " cannot be encoded as an Long without changing its value");
+            }
+            return encodeLong((long)v, b, o);
+        }
+
+        @Override
+        public int encodeDouble(double v, byte[] b, int o) {
+            if (v < Long.MIN_VALUE || v > Long.MAX_VALUE) {
+                throw new IllegalDataException("Value " + v + " cannot be encoded as an Long without changing its value");
+            }
+            return encodeLong((long)v, b, o);
+        }
+
+        @Override
+        public int encodeLong(long v, byte[] b, int o) {
+            PositionedByteRange pbr = new SimplePositionedByteRange(b, o, Bytes.SIZEOF_LONG);
+            // TODO figure out how order is handled -- for now assume ascending.
+            OrderedInt64.ASCENDING.encode(pbr, v);
+            return Bytes.SIZEOF_LONG + 1;
+        }
+
+        @Override
+        public byte decodeByte(byte[] b, int o, SortOrder sortOrder) {
+            long v = decodeLong(b, o, sortOrder);
+            if (v < Byte.MIN_VALUE || v > Byte.MAX_VALUE) {
+                throw new IllegalDataException("Value " + v + " cannot be cast to Byte without changing its value");
+            }
+            return (byte)v;
+        }
+
+        @Override
+        public short decodeShort(byte[] b, int o, SortOrder sortOrder) {
+            long v = decodeLong(b, o, sortOrder);
+            if (v < Short.MIN_VALUE || v > Short.MAX_VALUE) {
+                throw new IllegalDataException("Value " + v + " cannot be cast to Short without changing its value");
+            }
+            return (short)v;
+        }
+
+        @Override
+        public int encodeByte(byte v, byte[] b, int o) {
+            return encodeLong(v, b, o);
+        }
+
+        @Override
+        public int encodeShort(short v, byte[] b, int o) {
+            return encodeLong(v, b, o);
+        }
+
+        @Override
+        public PhoenixArrayFactory getPhoenixArrayFactory() {
+            return new PhoenixArrayFactory() {
+                @Override
+                public PhoenixArray newArray(PDataType type, Object[] elements) {
+                    return new PhoenixArray.PrimitiveLongPhoenixArray(type, elements);
+                }
+            };
         }
     }
 

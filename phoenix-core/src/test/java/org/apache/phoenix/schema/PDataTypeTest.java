@@ -37,6 +37,7 @@ import java.util.List;
 import org.apache.hadoop.hbase.io.ImmutableBytesWritable;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.phoenix.util.TestUtil;
+import org.junit.Ignore;
 import org.junit.Test;
 
 
@@ -1592,6 +1593,9 @@ public class PDataTypeTest {
         assertEquals(bd.toString(), bd.scale(), v[1]);
     }
 
+
+    // Simulate what an HBase Increment does with the value encoded as a long
+    @Ignore("Changed long encoding to not be the same as native HBase Bytes")
     @Test
     public void testArithmeticOnLong() {
         long startWith = -5;
@@ -1617,7 +1621,6 @@ public class PDataTypeTest {
         }
     }
 
-    // Simulate what an HBase Increment does with the value encoded as a long
     private long nextValueFor(long startWith, long incrementBy) {
         long hstartWith = Bytes.toLong(PDataType.LONG.toBytes(startWith));
         hstartWith += incrementBy;
