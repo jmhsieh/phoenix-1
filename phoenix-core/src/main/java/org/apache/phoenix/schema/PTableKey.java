@@ -19,6 +19,9 @@ package org.apache.phoenix.schema;
 
 import com.google.common.base.Preconditions;
 
+/**
+ * PTableKey.  A struct that contains tenantId and table name.
+ */
 public class PTableKey {
     private final PName tenantId;
     private final String name;
