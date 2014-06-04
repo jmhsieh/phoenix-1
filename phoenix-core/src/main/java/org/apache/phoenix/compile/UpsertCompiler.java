@@ -107,7 +107,7 @@ public class UpsertCompiler {
             } else {
                 columnValues.put(column, value);
             }
-        }
+        } // TODO here's where the row key is generated
         ImmutableBytesPtr ptr = new ImmutableBytesPtr();
         table.newKey(ptr, pkValues);
         mutation.put(ptr, columnValues);

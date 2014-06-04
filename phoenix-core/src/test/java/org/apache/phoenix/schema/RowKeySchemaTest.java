@@ -97,22 +97,28 @@ public class RowKeySchemaTest  extends BaseConnectionlessQueryTest  {
         int minOffset = keyValue.getRowOffset();
         ImmutableBytesWritable ptr = new ImmutableBytesWritable();
         int nExpectedValues = values.length;
-        for (int i = values.length-1; i >=0; i--) {
-            if (values[i] == null) {
-                nExpectedValues--;
-            } else {
-                break;
-            }
-        }
+//        for (int i = values.length-1; i >=0; i--) {
+//            if (values[i] == null) {
+//                nExpectedValues--;
+//            } else {
+//                break;
+//            }
+//        }
         int i = 0;
         int maxOffset = schema.iterator(keyValue.getRowArray(), minOffset, keyValue.getRowLength(), ptr);
         for (i = 0; i < schema.getFieldCount(); i++) {
             Boolean hasValue = schema.next(ptr, i, maxOffset);
-            if (hasValue == null) {
-                break;
-            }
-            assertTrue(hasValue);
+            // We no longer encode string/varbinary with nulls.
+//            if (hasValue == null) {
+//                break;
+//            }
+//            assertTrue(hasValue);
             PDataType type = PDataType.fromLiteral(values[i]);
+            // now see if we have a null type
+            if (type == null) {
+                continue;
+            }
+
             SortOrder sortOrder = sortOrders.get(i);
             Object value = type.toObject(ptr, schema.getField(i).getDataType(), sortOrder);
             assertEquals(values[i], value);
@@ -122,13 +128,18 @@ public class RowKeySchemaTest  extends BaseConnectionlessQueryTest  {
         
         for (i--; i >= 0; i--) {
             Boolean hasValue = schema.previous(ptr, i, minOffset);
-            if (hasValue == null) {
-                break;
-            }
-            assertTrue(hasValue);
+//            if (hasValue == null) {
+//                break;
+//            }
+//            assertTrue(hasValue);
             PDataType type = PDataType.fromLiteral(values[i]);
+            if (type == null) {
+                continue;
+            }
             SortOrder sortOrder = sortOrders.get(i);
-            Object value = type.toObject(ptr, schema.getField(i).getDataType(), sortOrder);
+            ValueSchema.Field f = schema.getField(i);
+            assert f != null;
+            Object value = type.toObject(ptr, f.getDataType(), sortOrder);
             assertEquals(values[i], value);
         }
         assertEquals(-1, i);

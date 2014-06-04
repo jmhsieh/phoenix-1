@@ -1001,7 +1001,7 @@ public class PDataTypeTest {
     public void testEmptyString() throws Throwable {
         byte[] b1 = PDataType.VARCHAR.toBytes("");
         byte[] b2 = PDataType.VARCHAR.toBytes(null);
-        assert (b1.length == 0 && Bytes.compareTo(b1, b2) == 0);
+        assert (b1.length == 2 && Bytes.compareTo(b1, b2) == 0);
     }
 
     @Test

@@ -128,6 +128,8 @@ public interface QueryConstants {
     /**
      * Separator used between variable length keys for a composite key.
      * Variable length data types may not use this byte value.
+     *
+     * TODO Composite key related.
      */
     public static final byte SEPARATOR_BYTE = (byte) 0;
     public static final byte[] SEPARATOR_BYTE_ARRAY = new byte[] {SEPARATOR_BYTE};

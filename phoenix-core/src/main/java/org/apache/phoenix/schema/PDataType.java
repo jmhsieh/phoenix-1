@@ -66,7 +66,7 @@ public enum PDataType {
         public byte[] toBytes(Object object) {
             // TODO: consider using avro UTF8 object instead of String
             // so that we get get the size easily
-            if (object == null) {
+            if (object == null || ((String)object).length() == 0) {
                 // return ByteUtil.EMPTY_BYTE_ARRAY;
                 return new byte[] { (byte)0, (byte)0 };
             }
@@ -90,13 +90,15 @@ public enum PDataType {
                 throw new ConstraintViolationException(actualType + " cannot be coerced to " + this);
             }
             if (length == 0) {
+//                NOTE: starting to distinguish "" from null;
+//                return "";
                 return null;
             }
-            bytes = kte.rleDecode(bytes, offset, length);
             if (sortOrder == SortOrder.DESC) {
                 bytes = SortOrder.invert(bytes, offset, length);
                 offset = 0;
             }
+            bytes = kte.rleDecode(bytes, offset, length);
             return Bytes.toString(bytes);
         }
 
@@ -320,7 +322,9 @@ public enum PDataType {
             if (object == null) {
                 throw new ConstraintViolationException(this + " may not be null");
             }
-            byte[] b = VARCHAR.toBytes(object);
+//            byte[] b = VARCHAR.toBytes(object);
+            byte[] b = Bytes.toBytes((String)object);
+            // HACK removing constraint since we delegate to VARCHAR
             if (b.length != ((String) object).length()) {
                 throw new IllegalDataException("CHAR types may only contain single byte characters (" + object + ")");
             }
@@ -332,7 +336,10 @@ public enum PDataType {
             if (object == null) {
                 throw new ConstraintViolationException(this + " may not be null");
             }
+//            byte[] b = Bytes.toBytes((String)object);
+
             int len = VARCHAR.toBytes(object, bytes, offset);
+            // HACK removing constraint since we delegate to VARCHAR
             if (len != ((String) object).length()) {
                 throw new IllegalDataException("CHAR types may only contain single byte characters (" + object + ")");
             }

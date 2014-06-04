@@ -115,7 +115,9 @@ public class PTableImpl implements PTable {
     private ViewType viewType;
     private Short viewIndexId;
     private int estimatedSize;
-    
+
+    private KTypeEncoder kte = new KTypeEncoder();
+
     public PTableImpl() {
     }
 
@@ -408,9 +410,10 @@ public class PTableImpl implements PTable {
     @Override
     public int newKey(ImmutableBytesWritable key, byte[][] values) {
         int nValues = values.length;
-        while (nValues > 0 && (values[nValues-1] == null || values[nValues-1].length == 0)) {
-            nValues--;
-        }
+        // TODO we aren't doing this ignore values because they are null bit
+//        while (nValues > 0 && (values[nValues-1] == null || values[nValues-1].length == 0)) {
+//            nValues--;
+//        }
         int i = 0;
         TrustedByteArrayOutputStream os = new TrustedByteArrayOutputStream(SchemaUtil.estimateKeyLength(this));
         try {
@@ -424,10 +427,12 @@ public class PTableImpl implements PTable {
             int nColumns = columns.size();
             PDataType type = null;
             while (i < nValues && i < nColumns) {
-                // Separate variable length column values in key with zero byte
-                if (type != null && !type.isFixedWidth()) {
-                    os.write(SEPARATOR_BYTE);
-                }
+                // TODO jmhsieh this is where we encode table values with \0's.  We want to replace with Struct generators.
+
+//                // Separate variable length column values in key with zero byte
+//                if (type != null && !type.isFixedWidth()) {
+//                    os.write(SEPARATOR_BYTE);
+//                }
                 PColumn column = columns.get(i);
                 type = column.getDataType();
                 // This will throw if the value is null and the type doesn't allow null
@@ -436,7 +441,7 @@ public class PTableImpl implements PTable {
                     byteValue = ByteUtil.EMPTY_BYTE_ARRAY;
                 }
                 // An empty byte array return value means null. Do this,
-                // since a type may have muliple representations of null.
+                // since a type may have multiple representations of null.
                 // For example, VARCHAR treats both null and an empty string
                 // as null. This way we don't need to leak that part of the
                 // implementation outside of PDataType by checking the value
@@ -450,6 +455,12 @@ public class PTableImpl implements PTable {
                 } else if (maxLength != null && byteValue.length > maxLength) {
                     throw new ConstraintViolationException(name.getString() + "." + column.getName().getString() + " may not exceed " + maxLength + " bytes (" + SchemaUtil.toString(type, byteValue) + ")");
                 }
+
+                // TODO why isn't this encoded before the write?  HACK!
+                if (type == PDataType.VARCHAR && byteValue.length == 0) {
+                    byteValue = kte.rleEncode(byteValue);
+                }
+
                 os.write(byteValue, 0, byteValue.length);
             }
             // If some non null pk values aren't set, then throw
