@@ -574,7 +574,7 @@ public class PTableImpl implements PTable {
                 mutations.add(deleteRow);
             } else {
                 // Because we cannot enforce a not null constraint on a KV column (since we don't know if the row exists when
-                // we upsert it), se instead add a KV that is always emtpy. This allows us to imitate SQL semantics given the
+                // we upsert it), we instead add a KV that is always empty. This allows us to imitate SQL semantics given the
                 // way HBase works.
                 addQuietly(setValues, kvBuilder, kvBuilder.buildPut(keyPtr,
                     SchemaUtil.getEmptyColumnFamilyPtr(PTableImpl.this),
