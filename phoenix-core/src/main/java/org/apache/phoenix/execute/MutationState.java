@@ -264,7 +264,6 @@ public class MutationState implements SQLCloseable {
     /**
      * Validates that the meta data is still valid based on the current server time
      * and returns the server time to use for the upsert for each table.
-     * @param connection
      * @return the server time to use for the upsert
      * @throws SQLException if the table or any columns no longer exist
      */
