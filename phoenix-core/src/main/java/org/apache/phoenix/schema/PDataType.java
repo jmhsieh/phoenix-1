@@ -58,16 +58,19 @@ import com.google.common.primitives.Longs;
  */
 @SuppressWarnings("rawtypes")
 public enum PDataType {
-	
+
     VARCHAR("VARCHAR", Types.VARCHAR, String.class, null) {
+        KTypeEncoder kte = new KTypeEncoder();
+
         @Override
         public byte[] toBytes(Object object) {
             // TODO: consider using avro UTF8 object instead of String
             // so that we get get the size easily
             if (object == null) {
-                return ByteUtil.EMPTY_BYTE_ARRAY;
+                // return ByteUtil.EMPTY_BYTE_ARRAY;
+                return new byte[] { (byte)0, (byte)0 };
             }
-            return Bytes.toBytes((String)object);
+            return kte.rleEncode(Bytes.toBytes((String)object));
         }
 
         @Override
@@ -76,6 +79,7 @@ public enum PDataType {
                 return 0;
             }
             byte[] b = toBytes(object); // TODO: no byte[] allocation: use CharsetEncoder
+            // TODO This can be optimized with the PBRs.
             System.arraycopy(b, 0, bytes, offset, b.length);
             return b.length;
         }
@@ -88,22 +92,23 @@ public enum PDataType {
             if (length == 0) {
                 return null;
             }
+            bytes = kte.rleDecode(bytes, offset, length);
             if (sortOrder == SortOrder.DESC) {
                 bytes = SortOrder.invert(bytes, offset, length);
                 offset = 0;
             }
-            return Bytes.toString(bytes, offset, length);
+            return Bytes.toString(bytes);
         }
 
         @Override
         public Object toObject(Object object, PDataType actualType) {
             switch (actualType) {
-            case VARCHAR:
-            case CHAR:
-                String s = (String)object;
-                return s == null || s.length() > 0 ? s : null;
-            default:
-                return throwConstraintViolationException(actualType,this);
+                case VARCHAR:
+                case CHAR:
+                    String s = (String)object;
+                    return s == null || s.length() > 0 ? s : null;
+                default:
+                    return throwConstraintViolationException(actualType,this);
             }
         }
 
@@ -125,7 +130,7 @@ public enum PDataType {
 
         @Override
         public boolean isSizeCompatible(ImmutableBytesWritable ptr, Object value, PDataType srcType,
-                Integer maxLength, Integer scale, Integer desiredMaxLength, Integer desiredScale) {
+                                        Integer maxLength, Integer scale, Integer desiredMaxLength, Integer desiredScale) {
             if (ptr.getLength() != 0 && maxLength != null && desiredMaxLength != null) {
                 return maxLength <= desiredMaxLength;
             }
@@ -175,6 +180,122 @@ public enum PDataType {
             return "'" + Bytes.toStringBinary(b, offset, length) + "'";
         }
     },
+//    VARCHAR("VARCHAR", Types.VARCHAR, String.class, null) {
+//        @Override
+//        public byte[] toBytes(Object object) {
+//            // TODO: consider using avro UTF8 object instead of String
+//            // so that we get get the size easily
+//            if (object == null) {
+//                return ByteUtil.EMPTY_BYTE_ARRAY;
+//            }
+//            return Bytes.toBytes((String)object);
+//        }
+//
+//        @Override
+//        public int toBytes(Object object, byte[] bytes, int offset) {
+//            if (object == null) {
+//                return 0;
+//            }
+//            byte[] b = toBytes(object); // TODO: no byte[] allocation: use CharsetEncoder
+//            System.arraycopy(b, 0, bytes, offset, b.length);
+//            return b.length;
+//        }
+//
+//        @Override
+//        public Object toObject(byte[] bytes, int offset, int length, PDataType actualType, SortOrder sortOrder, Integer maxLength, Integer scale) {
+//            if (!actualType.isCoercibleTo(this)) {
+//                throw new ConstraintViolationException(actualType + " cannot be coerced to " + this);
+//            }
+//            if (length == 0) {
+//                return null;
+//            }
+//            if (sortOrder == SortOrder.DESC) {
+//                bytes = SortOrder.invert(bytes, offset, length);
+//                offset = 0;
+//            }
+//            return Bytes.toString(bytes, offset, length);
+//        }
+//
+//        @Override
+//        public Object toObject(Object object, PDataType actualType) {
+//            switch (actualType) {
+//            case VARCHAR:
+//            case CHAR:
+//                String s = (String)object;
+//                return s == null || s.length() > 0 ? s : null;
+//            default:
+//                return throwConstraintViolationException(actualType,this);
+//            }
+//        }
+//
+//        @Override
+//        public boolean isCoercibleTo(PDataType targetType) {
+//            return this == targetType || targetType == CHAR || targetType == VARBINARY || targetType == BINARY;
+//        }
+//
+//        @Override
+//        public boolean isCoercibleTo(PDataType targetType, Object value) {
+//            if (isCoercibleTo(targetType)) {
+//                if (targetType == PDataType.CHAR) {
+//                    return value != null;
+//                }
+//                return true;
+//            }
+//            return false;
+//        }
+//
+//        @Override
+//        public boolean isSizeCompatible(ImmutableBytesWritable ptr, Object value, PDataType srcType,
+//                Integer maxLength, Integer scale, Integer desiredMaxLength, Integer desiredScale) {
+//            if (ptr.getLength() != 0 && maxLength != null && desiredMaxLength != null) {
+//                return maxLength <= desiredMaxLength;
+//            }
+//            return true;
+//        }
+//
+//        @Override
+//        public boolean isFixedWidth() {
+//            return false;
+//        }
+//
+//        @Override
+//        public int estimateByteSize(Object o) {
+//            String value = (String) o;
+//            return value == null ? 1 : value.length();
+//        }
+//
+//        @Override
+//        public Integer getByteSize() {
+//            return null;
+//        }
+//
+//        @Override
+//        public int compareTo(Object lhs, Object rhs, PDataType rhsType) {
+//            return ((String)lhs).compareTo((String)rhs);
+//        }
+//
+//        @Override
+//        public Object toObject(String value) {
+//            return value;
+//        }
+//
+//        @Override
+//        public boolean isBytesComparableWith(PDataType otherType) {
+//            return super.isBytesComparableWith(otherType) || this == CHAR;
+//        }
+//
+//        @Override
+//        public String toStringLiteral(byte[] b, int offset, int length, Format formatter) {
+//            while (b[length-1] == 0) {
+//                length--;
+//            }
+//            if (formatter != null) {
+//                Object o = toObject(b,offset,length);
+//                return "'" + formatter.format(o) + "'";
+//            }
+//            return "'" + Bytes.toStringBinary(b, offset, length) + "'";
+//        }
+//    },
     /**
      * Fixed length single byte characters
      */
