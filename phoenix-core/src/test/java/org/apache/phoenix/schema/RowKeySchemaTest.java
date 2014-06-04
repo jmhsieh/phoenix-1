@@ -47,9 +47,23 @@ public class RowKeySchemaTest  extends BaseConnectionlessQueryTest  {
     private void assertExpectedRowKeyValue(String dataColumns, String pk, Object[] values) throws Exception {
         assertIteration(dataColumns,pk,values,"");
     }
-    
+
+    /**
+     * Creates a table T with columns dataColumns, with primary key components pk.
+     * Then upserts values into the table using a prepared statement.
+     *
+     *
+     *
+     * @param dataColumns string with comma separated field and type.
+     * @param pk fields to use in primary key
+     * @param values string with comma separated values of columns
+     * @param dataProps ?
+     * @throws Exception
+     */
     private void assertIteration(String dataColumns, String pk, Object[] values, String dataProps) throws Exception {
         String schemaName = "";
+
+        // create table
         String tableName = "T";
         Connection conn = DriverManager.getConnection(getUrl());
         String fullTableName = SchemaUtil.getTableName(SchemaUtil.normalizeIdentifier(schemaName),SchemaUtil.normalizeIdentifier(tableName));
@@ -57,6 +71,8 @@ public class RowKeySchemaTest  extends BaseConnectionlessQueryTest  {
         PhoenixConnection pconn = conn.unwrap(PhoenixConnection.class);
         PTable table = pconn.getMetaDataCache().getTable(new PTableKey(pconn.getTenantId(), fullTableName));
         conn.close();
+
+        // insert data using prepared statement
         StringBuilder buf = new StringBuilder("UPSERT INTO " + fullTableName  + " VALUES(");
         for (int i = 0; i < values.length; i++) {
             buf.append("?,");
@@ -67,7 +83,9 @@ public class RowKeySchemaTest  extends BaseConnectionlessQueryTest  {
             stmt.setObject(i+1, values[i]);
         }
         stmt.execute();
-            Iterator<Pair<byte[],List<KeyValue>>> iterator = PhoenixRuntime.getUncommittedDataIterator(conn);
+
+        // verify row key data
+        Iterator<Pair<byte[],List<KeyValue>>> iterator = PhoenixRuntime.getUncommittedDataIterator(conn);
         List<KeyValue> dataKeyValues = iterator.next().getSecond();
         KeyValue keyValue = dataKeyValues.get(0);
         
