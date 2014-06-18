@@ -25,27 +25,6 @@ import org.apache.hadoop.hbase.util.SimplePositionedByteRange;
  * New type encodings for Typed data.
  */
 public class KTypeEncoder {
-    enum RawType {
-        INT64(1), INT32(2), INT16(3), INT8(4), RLEBYTES(5), FIXEDBYTES(6);
-        private int val;
-        RawType(int val) { this.val = val; }
-        public int getVal() { return val; }
-    };
-
-    /**
-     * A tag preserves order for complex row keys by encoding a position ordinal and a raw storage type.
-     * The most significant five bits encode position, while the remaining three encode type.  This limits a rowkey
-     * to 32 fields, but allows nulls or skipped fields to be ordered after keys where the field is present.
-     *
-     * @param pos constrained from 0 to 31.
-     * @param t raw encoding type that follows.
-     * @return encoded tag value.
-     */
-    byte encodeTag(int pos, RawType t) {
-        Preconditions.checkPositionIndex(pos, 32, "Type position too large");
-        Preconditions.checkNotNull(t, "Must specify non-null RawType for tag");
-       return  (byte) ((pos << 3) | (t.getVal() & 0x7));
-    }
 
     int MAX_UNSIGNED_BYTE = 255;
 

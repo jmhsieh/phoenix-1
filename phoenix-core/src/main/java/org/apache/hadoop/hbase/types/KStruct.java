@@ -19,6 +19,7 @@ package org.apache.hadoop.hbase.types;
 
 import java.util.Iterator;
 
+import com.google.common.base.Preconditions;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.hbase.util.Order;
@@ -136,8 +137,13 @@ public class KStruct implements DataType<Object[]> {
   public int encodedLength(Object[] val) {
     assert fields.length >= val.length;
     int sum = 0;
-    for (int i = 0; i < val.length; i++)
+    for (int i = 0; i < val.length; i++) {
+      if (val[i] == null) {
+          continue;
+      }
+      sum++; // tag
       sum += fields[i].encodedLength(val[i]);
+    }
     return sum;
   }
 
@@ -188,13 +194,83 @@ public class KStruct implements DataType<Object[]> {
     if (val.length == 0) return 0;
     assert fields.length >= val.length;
     int end, written = 0;
+
+    // We don't have this constraint any more with tags.
     // find the last occurrence of a non-null or null and non-nullable value
     for (end = val.length - 1; end > -1; end--) {
       if (null != val[end] || (null == val[end] && !fields[end].isNullable())) break;
     }
     for (int i = 0; i <= end; i++) {
+      if (val[i] == null) {
+        // skip null values
+        continue;
+      }
+      // insert tag byte and then encoded bytes
+      dst.put(generateTag(i, fields[i]));
+      written ++;
       written += fields[i].encode(dst, val[i]);
     }
     return written;
   }
+
+  byte generateTag(int pos, DataType t) {
+      RawSize rawSize = null;
+      if (t instanceof KByteArray || t instanceof KRawString) {
+          switch (t.getOrder()) {
+              case ASCENDING:
+                  rawSize = RawSize.RLZBYTES;
+                  break;
+              case DESCENDING:
+                  rawSize = RawSize.RLZBYTESDESC;
+                  break;
+          }
+      } else if (t instanceof RawInteger) {
+          rawSize = RawSize.INT32;
+      } else if (t instanceof RawLong) {
+          rawSize = RawSize.INT64;
+      } else if (t instanceof RawDouble) {
+          rawSize = RawSize.INT64;
+      }
+      // ...
+      // TODO
+
+      if (rawSize == null) {
+          // TODO
+          throw new IllegalStateException("Currently cannot handle type " + t);
+      }
+      return encodeTag(pos, rawSize);
+  }
+
+
+    enum RawSize {
+        PROTO(0), INT64(1), INT32(2), INT16(3), INT8(4), RLZBYTES(5), FIXEDBYTES(6), RLZBYTESDESC(7);
+        private int val;
+        RawSize(int val) { this.val = val; }
+        public int getVal() { return val; }
+    };
+
+    /**
+     * A tag preserves order for complex row keys by encoding a position ordinal and a raw storage type.
+     * The most significant five bits encode position, while the remaining three encode type.  This limits a rowkey
+     * to 32 fields, but allows nulls or skipped fields to be ordered after keys where the field is present.
+     *
+     * @param pos constrained from 0 to 31.
+     * @param t raw encoding type that follows.
+     * @return encoded tag value.
+     */
+    byte encodeTag(int pos, RawSize t) {
+        Preconditions.checkPositionIndex(pos, 32, "Type position too large");
+        Preconditions.checkNotNull(t, "Must specify non-null RawType for tag");
+        return  (byte) ((pos << 3) | (t.getVal() & 0x7));
+    }
+
+    public static int tagPos(byte tag){
+        return ((int)tag) >> 3;
+    }
+
+    public static RawSize tagType(byte tag) {
+        int pos = tag >> 3;
+        return RawSize.values()[pos];
+    }
+
 }

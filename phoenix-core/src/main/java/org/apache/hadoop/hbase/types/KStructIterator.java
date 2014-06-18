@@ -80,11 +80,16 @@ public class KStructIterator implements Iterator<Object> {
   @Override
   public Object next() {
     if (!hasNext()) throw new NoSuchElementException();
+    int curIdx = idx;
     DataType<?> t = types[idx++];
     if (src.getPosition() == src.getLength() && t.isNullable()) return null;
 
-    // TODO Read Tag and position.  If not matching, then return null.  if matching return decode.
+    // did we have an implicit null from a skipped field?  return null
+    byte tag = src.peek();
+    int pos = KStruct.tagPos(tag);
+    if (pos != curIdx) return null;
 
+    src.get(); // move forward past the tag
     return t.decode(src);
   }
 
