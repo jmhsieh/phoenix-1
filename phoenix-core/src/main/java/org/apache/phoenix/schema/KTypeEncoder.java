@@ -52,17 +52,17 @@ public class KTypeEncoder {
     /**
      * Encode data from the src PBR into the dst PBR.
      *
-     * @param dst
+     * @param dst destination pbr.  if null, then we don't write but still return length
      * @param src
-     * @param len
+     * @param maxLen
      * @return size of encoded bytes
      */
-    int rleEncode(PositionedByteRange dst, PositionedByteRange src, int len) {
+    public int rleEncode(PositionedByteRange dst, PositionedByteRange src, int maxLen) {
         int encSz = 0;
         byte b;
 
-        Preconditions.checkArgument(src.getRemaining() >= len, "illegal len! it is larger than bytes remaining");
-        for (int i = 0; i <= len ; i++) {
+        Preconditions.checkArgument(src.getRemaining() >= maxLen, "illegal maxLen! it is larger than bytes remaining");
+        for (int i = 0; i <= maxLen ; i++) {
             // nothing left, bail out
             if (src.getRemaining() <= 0) {
                 break;
@@ -71,7 +71,8 @@ public class KTypeEncoder {
             b = src.get();
             // normal case, byte is not 0
             if (b != 0) {
-                dst.put(b);
+                if (dst != null)
+                    dst.put(b);
                 encSz++;
                 continue;
             }
@@ -89,13 +90,17 @@ public class KTypeEncoder {
                 }
             }
 
-            dst.put((byte) 0x0);
-            dst.put((byte) ~run);
+            if (dst != null) {
+                dst.put((byte) 0x0);
+                dst.put((byte) ~run);
+            }
             encSz += 2;
         }
         // end marker
-        dst.put((byte) 0x0);
-        dst.put((byte) 0x0);
+        if (dst != null) {
+            dst.put((byte) 0x0);
+            dst.put((byte) 0x0);
+        }
         encSz += 2;
         return encSz;
     }
@@ -103,15 +108,15 @@ public class KTypeEncoder {
     /**
      * Decode data from the src PBR into the dst PBR
      *
-     * @param dst
+     * @param dst desitination pbr.  If null, we don't write but still return maxLen.
      * @param src
-     * @param len
+     * @param maxLen
      * @return size of decoded bytes
      */
-    int rleDecode(PositionedByteRange dst, PositionedByteRange src, int len) {
+    public int rleDecode(PositionedByteRange dst, PositionedByteRange src, int maxLen) {
         byte b = 0;
         int decSz =0;
-        for (int i =0; i < len; i++) {
+        for (int i =0; i < maxLen; i++) {
             // nothing left, bail out.
             if (src.getRemaining() <= 0) {
                 break;
@@ -121,7 +126,8 @@ public class KTypeEncoder {
 
             // normal case, byte is not 0
             if (b != 0) {
-                dst.put(b);
+                if (dst != null)
+                    dst.put(b);
                 decSz++;
                 continue;
             }
@@ -147,7 +153,8 @@ public class KTypeEncoder {
             run = 0xff & (~run);
 
             for (int j = 0; j < run; j++) {
-                dst.put((byte)0);
+                if (dst != null)
+                    dst.put((byte)0);
                 decSz++;
             }
         }
