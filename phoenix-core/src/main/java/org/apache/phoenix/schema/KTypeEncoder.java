@@ -190,5 +190,12 @@ public class KTypeEncoder {
         return tmp;
     }
 
+    // descending encoders
+
+    // invert bits in run length so that a long string of 0's encodes after fewer zeros
+    // raw bytes    rle'd               rle+invert        descending
+    // 00 00 01  -> 00 "02" 01 00 00 => 00 fd 01 00 00 => ff 02 ff ff
+    // 00 00 00  -> 00 "03" 00 00    => 00 fc 00 00    => ff 03 ff ff
+    // -         -> 00 00            => 00 00          => ff ff        (order preserved)
 
 }
