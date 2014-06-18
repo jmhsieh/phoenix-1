@@ -44,7 +44,7 @@ public class KByteArray implements DataType<byte[]> {
 
     @Override
     public Order getOrder() {
-        return null;
+        return order;
     }
 
     @Override

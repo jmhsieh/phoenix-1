@@ -96,7 +96,7 @@ public class KRawString implements DataType<String> {
   public int encode(PositionedByteRange dst, String val) {
     byte[] s = Bytes.toBytes(val);
     order.apply(s);
-    getKba().encode(dst, s);
-    return s.length;
+    int sz = getKba().encode(dst, s);
+    return sz;
   }
 }
