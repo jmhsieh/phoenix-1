@@ -129,6 +129,11 @@ public interface PTable {
      */
     PTableType getType();
 
+    /**
+     * TODO is this supposed to be the first of the primary key or the composite of it all?
+     *
+     * @return Primary key name
+     */
     PName getPKName();
 
     /**
@@ -150,6 +155,8 @@ public interface PTable {
     List<PColumnFamily> getColumnFamilies();
 
     /**
+     * TODO This should be removed since it is inconsistent.
+     *
      * Get the column family with the given name
      * @param family the column family name
      * @return the PColumnFamily with the given name
@@ -157,6 +164,12 @@ public interface PTable {
      */
     PColumnFamily getColumnFamily(byte[] family) throws ColumnFamilyNotFoundException;
 
+    /**
+     * Get the column family with the given name
+     * @param family the column family name
+     * @return the PColumnFamily with the given name
+     * @throws ColumnFamilyNotFoundException if the column family cannot be found
+     */
     PColumnFamily getColumnFamily(String family) throws ColumnFamilyNotFoundException;
 
     /**
@@ -214,6 +227,7 @@ public interface PTable {
      * @return the number of values that were used from values to set
      * the row key
      */
+    @Deprecated // use Literal values instead of byte[] values
     int newKey(ImmutableBytesWritable key, byte[][] values);
 
     /**
@@ -222,6 +236,11 @@ public interface PTable {
      */
     PTableStats getTableStats();
 
+    /**
+     * TODO - probably want to rename RowKeySchema to PRowKeySchema, poossibly hide this method
+     *
+     * @return row key schema for the table
+     */
     RowKeySchema getRowKeySchema();
 
     /**
@@ -263,6 +282,11 @@ public interface PTable {
      */
     public List<PName> getPhysicalNames();
 
+    /**
+     * What is a physical name?  does physical == hbase table name?
+     *
+     * @return
+     */
     PName getPhysicalName();
     boolean isImmutableRows();
 
