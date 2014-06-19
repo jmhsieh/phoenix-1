@@ -41,8 +41,8 @@ public class KRawString implements DataType<String> {
 
   protected final Order order;
 
-  protected KRawString() { this.order = Order.ASCENDING; }
-  protected KRawString(Order order) { this.order = order; }
+  public KRawString() { this.order = Order.ASCENDING; }
+  public KRawString(Order order) { this.order = order; }
 
   private KByteArray getKba() {
       switch (order) {
