@@ -772,7 +772,7 @@ public class MetaDataClient {
                 incrementStatement.execute();
                 // Get list of mutations and add to table meta data that will be passed to server
                 // to guarantee order. This row will always end up last
-                tableMetaData.addAll(connection.getMutationState().toMutations().next().getSecond());
+                tableMetaData.addAll(connection.getMutationState().toHMutations().next().getSecond());
                 connection.rollback();
 
                 // Add row linking from data table row to index table row
@@ -1103,7 +1103,7 @@ public class MetaDataClient {
                 addColumnMutation(schemaName, tableName, column, colUpsert, parentTableName, pkName, keySeq, saltBucketNum != null);
             }
             
-            tableMetaData.addAll(connection.getMutationState().toMutations().next().getSecond());
+            tableMetaData.addAll(connection.getMutationState().toHMutations().next().getSecond());
             connection.rollback();
             
             String dataTableName = parent == null || tableType == PTableType.VIEW ? null : parent.getTableName().getString();
@@ -1140,7 +1140,7 @@ public class MetaDataClient {
             }
             tableUpsert.execute();
             
-            tableMetaData.addAll(connection.getMutationState().toMutations().next().getSecond());
+            tableMetaData.addAll(connection.getMutationState().toHMutations().next().getSecond());
             connection.rollback();
             
             /*
@@ -1555,7 +1555,7 @@ public class MetaDataClient {
                         }
                     }
 
-                    tableMetaData.addAll(connection.getMutationState().toMutations().next().getSecond());
+                    tableMetaData.addAll(connection.getMutationState().toHMutations().next().getSecond());
                     connection.rollback();
                 } else {
                     // Only support setting IMMUTABLE_ROWS=true and DISABLE_WAL=true on ALTER TABLE SET command
@@ -1585,12 +1585,12 @@ public class MetaDataClient {
                     for (PTable index : table.getIndexes()) {
                         incrementTableSeqNum(index, index.getType(), 1);
                     }
-                    tableMetaData.addAll(connection.getMutationState().toMutations().next().getSecond());
+                    tableMetaData.addAll(connection.getMutationState().toHMutations().next().getSecond());
                     connection.rollback();
                 }
                 long seqNum = incrementTableSeqNum(table, statement.getTableType(), 1, isImmutableRows, disableWAL, multiTenant);
                 
-                tableMetaData.addAll(connection.getMutationState().toMutations().next().getSecond());
+                tableMetaData.addAll(connection.getMutationState().toHMutations().next().getSecond());
                 connection.rollback();
                 // Force the table header row to be first
                 Collections.reverse(tableMetaData);
@@ -1810,11 +1810,11 @@ public class MetaDataClient {
                     }
                     
                 }
-                tableMetaData.addAll(connection.getMutationState().toMutations().next().getSecond());
+                tableMetaData.addAll(connection.getMutationState().toHMutations().next().getSecond());
                 connection.rollback();
                 
                 long seqNum = incrementTableSeqNum(table, statement.getTableType(), -1);
-                tableMetaData.addAll(connection.getMutationState().toMutations().next().getSecond());
+                tableMetaData.addAll(connection.getMutationState().toHMutations().next().getSecond());
                 connection.rollback();
                 // Force table header to be first in list
                 Collections.reverse(tableMetaData);
@@ -1944,7 +1944,7 @@ public class MetaDataClient {
                     tableUpsert.close();
                 }
             }
-            List<Mutation> tableMetadata = connection.getMutationState().toMutations().next().getSecond();
+            List<Mutation> tableMetadata = connection.getMutationState().toHMutations().next().getSecond();
             connection.rollback();
 
             MetaDataMutationResult result = connection.getQueryServices().updateIndexState(tableMetadata, dataTableName);

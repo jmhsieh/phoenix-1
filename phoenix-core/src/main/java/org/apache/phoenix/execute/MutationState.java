@@ -221,11 +221,11 @@ public class MutationState implements SQLCloseable {
      * Get the unsorted list of HBase mutations for the tables with uncommitted data.
      * @return list of HBase mutations for uncommitted data.
      */
-    public Iterator<Pair<byte[],List<Mutation>>> toMutations() {
-        return toMutations(false);
+    public Iterator<Pair<byte[],List<Mutation>>> toHMutations() {
+        return toHMutations(false);
     }
     
-    public Iterator<Pair<byte[],List<Mutation>>> toMutations(final boolean includeMutableIndexes) {
+    public Iterator<Pair<byte[],List<Mutation>>> toHMutations(final boolean includeMutableIndexes) {
         final Iterator<Map.Entry<TableRef, Map<ImmutableBytesPtr,Map<PColumn,byte[]>>>> iterator = this.mutations.entrySet().iterator();
         if (!iterator.hasNext()) {
             return Iterators.emptyIterator();

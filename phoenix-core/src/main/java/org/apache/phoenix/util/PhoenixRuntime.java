@@ -294,7 +294,7 @@ public class PhoenixRuntime {
      */
     public static Iterator<Pair<byte[],List<KeyValue>>> getUncommittedDataIterator(Connection conn, boolean includeMutableIndexes) throws SQLException {
         final PhoenixConnection pconn = conn.unwrap(PhoenixConnection.class);
-        final Iterator<Pair<byte[],List<Mutation>>> iterator = pconn.getMutationState().toMutations(includeMutableIndexes);
+        final Iterator<Pair<byte[],List<Mutation>>> iterator = pconn.getMutationState().toHMutations(includeMutableIndexes);
         return new Iterator<Pair<byte[],List<KeyValue>>>() {
 
             @Override
