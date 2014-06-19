@@ -630,7 +630,7 @@ public class UpsertCompiler {
         // UPSERT VALUES
         /////////////////////////////////////////////////////////////////////
         int nodeIndex = 0;
-        // initialze values with constant byte values first
+        // initialize values with constant byte values first
         final byte[][] values = new byte[nValuesToSet][];
         if (isTenantSpecific) {
             values[nodeIndex++] = connection.getTenantId().getBytes();
@@ -688,7 +688,7 @@ public class UpsertCompiler {
                     sequenceManager.newSequenceTuple(null);
                 for (Expression constantExpression : constantExpressions) {
                     PColumn column = allColumns.get(columnIndexes[nodeIndex]);
-                    constantExpression.evaluate(tuple, ptr);
+                    constantExpression.evaluate(tuple, ptr);  // set's value in ptr.
                     Object value = null;
                     if (constantExpression.getDataType() != null) {
                         value = constantExpression.getDataType().toObject(ptr, constantExpression.getSortOrder(), constantExpression.getMaxLength(), constantExpression.getScale());
@@ -726,7 +726,26 @@ public class UpsertCompiler {
                     }
                 }
                 Map<ImmutableBytesPtr, Map<PColumn, byte[]>> mutation = Maps.newHashMapWithExpectedSize(1);
-                setValues(values, pkSlotIndexes, columnIndexes, tableRef.getTable(), mutation);
+                PTable table1 = tableRef.getTable();
+                Map<PColumn,byte[]> columnValues = Maps.newHashMapWithExpectedSize(columnIndexes.length);
+                byte[][] pkValues = new byte[table1.getPKColumns().size()][];
+                // If the table uses salting, the first byte is the salting byte, set to an empty array
+                // here and we will fill in the byte later in PRowImpl.
+                if (table1.getBucketNum() != null) {
+                    pkValues[0] = new byte[] {0};
+                }
+                for (int i = 0; i < values.length; i++) {
+                    byte[] value = values[i];
+                    PColumn column = table1.getColumns().get(columnIndexes[i]);
+                    if (SchemaUtil.isPKColumn(column)) {
+                        pkValues[pkSlotIndexes[i]] = value;
+                    } else {
+                        columnValues.put(column, value);
+                    }
+                }
+                ImmutableBytesPtr ptr1 = new ImmutableBytesPtr();
+                table1.newKey(ptr1, pkValues);
+                mutation.put(ptr1, columnValues);
                 return new MutationState(tableRef, mutation, 0, maxSize, connection);
             }
 
