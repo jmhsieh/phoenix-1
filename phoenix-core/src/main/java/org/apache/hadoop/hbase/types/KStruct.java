@@ -17,6 +17,8 @@
  */
 package org.apache.hadoop.hbase.types;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.util.Iterator;
 
 import com.google.common.base.Preconditions;
@@ -211,6 +213,37 @@ public class KStruct implements DataType<Object[]> {
       written += fields[i].encode(dst, val[i]);
     }
     return written;
+  }
+
+    /**
+     * Phoenix assumes bytes have been converted already and deals with byte to byte operations.
+     * @param dst
+     * @param encVals already encoded values.
+     * @return
+     */
+    public int encodeBytes(ByteArrayOutputStream dst, byte[][] encVals) throws IOException {
+      if (encVals.length == 0) return 0;
+      assert fields.length >= encVals.length;
+      int end, written = 0;
+
+      // We don't have this constraint any more with tags.
+      // find the last occurrence of a non-null or null and non-nullable value
+      for (end = encVals.length - 1; end > -1; end--) {
+          if (null != encVals[end] || (null == encVals[end] && !fields[end].isNullable())) break;
+      }
+      for (int i = 0; i < end; i++) {
+          if (encVals[i] == null) {
+              // skip null values
+              continue;
+          }
+
+          // insert tag byte and then encoded bytes
+          dst.write(generateTag(i, fields[i]));
+          written++;
+          dst.write(encVals[i]);
+          written += encVals[i].length;
+      }
+      return written;
   }
 
   byte generateTag(int pos, DataType t) {

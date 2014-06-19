@@ -39,6 +39,9 @@ import org.apache.hadoop.hbase.client.Durability;
 import org.apache.hadoop.hbase.client.Mutation;
 import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.io.ImmutableBytesWritable;
+import org.apache.hadoop.hbase.types.DataType;
+import org.apache.hadoop.hbase.types.KStruct;
+import org.apache.hadoop.hbase.types.KStructBuilder;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.phoenix.coprocessor.generated.PTableProtos;
 import org.apache.phoenix.hbase.index.util.ImmutableBytesPtr;
@@ -414,55 +417,29 @@ public class PTableImpl implements PTable {
         int i = 0;
         TrustedByteArrayOutputStream os = new TrustedByteArrayOutputStream(SchemaUtil.estimateKeyLength(this));
         try {
+            // TODO should make salt the default 0 index field.  if it isn't present, oh well.
             Integer bucketNum = this.getBucketNum();
             if (bucketNum != null) {
                 // Write place holder for salt byte
                 i++;
                 os.write(QueryConstants.SEPARATOR_BYTE_ARRAY);
             }
+
+            // convert this to datatype api.
             List<PColumn> columns = getPKColumns();
-            int nColumns = columns.size();
-            PDataType type = null;
-            while (i < nValues && i < nColumns) {
-                // Separate variable length column values in key with zero byte
-                if (type != null && !type.isFixedWidth()) {
-                    os.write(SEPARATOR_BYTE);
-                }
-                PColumn column = columns.get(i);
-                type = column.getDataType();
-                // This will throw if the value is null and the type doesn't allow null
-                byte[] byteValue = values[i++];
-                if (byteValue == null) {
-                    byteValue = ByteUtil.EMPTY_BYTE_ARRAY;
-                }
-                // An empty byte array return value means null. Do this,
-                // since a type may have muliple representations of null.
-                // For example, VARCHAR treats both null and an empty string
-                // as null. This way we don't need to leak that part of the
-                // implementation outside of PDataType by checking the value
-                // here.
-                if (byteValue.length == 0 && !column.isNullable()) { 
-                    throw new ConstraintViolationException(name.getString() + "." + column.getName().getString() + " may not be null");
-                }
-                Integer	maxLength = column.getMaxLength();
-                if (maxLength != null && type.isFixedWidth() && byteValue.length <= maxLength) {
-                    byteValue = StringUtil.padChar(byteValue, maxLength);
-                } else if (maxLength != null && byteValue.length > maxLength) {
-                    throw new ConstraintViolationException(name.getString() + "." + column.getName().getString() + " may not exceed " + maxLength + " bytes (" + SchemaUtil.toString(type, byteValue) + ")");
-                }
-                os.write(byteValue, 0, byteValue.length);
+            KStructBuilder builder = new KStructBuilder();
+            for (PColumn pcol : columns) {
+                DataType dt = pcol.getDataType().getHDataType();
+                builder.add(dt);
             }
-            // If some non null pk values aren't set, then throw
-            if (i < nColumns) {
-                PColumn column = columns.get(i);
-                type = column.getDataType();
-                if (type.isFixedWidth() || !column.isNullable()) {
-                    throw new ConstraintViolationException(name.getString() + "." + column.getName().getString() + " may not be null");
-                }
+            KStruct rowStruct = builder.toStruct();
+
+            try {
+                rowStruct.encodeBytes(os, values);
+            } catch (IOException ioe) {
+                // TODO handle this
             }
-            if (nValues == 0) { 
-                throw new ConstraintViolationException("Primary key may not be null ("+ name.getString() + ")");
-            }
+
             byte[] buf = os.getBuffer();
             int size = os.size();
             if (bucketNum != null) {
@@ -470,6 +447,59 @@ public class PTableImpl implements PTable {
             }
             key.set(buf,0,size);
             return i;
+
+
+            // // Replacing this with struct stuff wholesale.
+//            List<PColumn> columns = getPKColumns();
+//            int nColumns = columns.size();
+//            PDataType type = null;
+//            while (i < nValues && i < nColumns) {
+//                // Separate variable length column values in key with zero byte
+//                if (type != null && !type.isFixedWidth()) {
+//                    os.write(SEPARATOR_BYTE);
+//                }
+//                PColumn column = columns.get(i);
+//                type = column.getDataType();
+//                // This will throw if the value is null and the type doesn't allow null
+//                byte[] byteValue = values[i++];
+//                if (byteValue == null) {
+//                    byteValue = ByteUtil.EMPTY_BYTE_ARRAY;
+//                }
+//                // An empty byte array return value means null. Do this,
+//                // since a type may have muliple representations of null.
+//                // For example, VARCHAR treats both null and an empty string
+//                // as null. This way we don't need to leak that part of the
+//                // implementation outside of PDataType by checking the value
+//                // here.
+//                if (byteValue.length == 0 && !column.isNullable()) {
+//                    throw new ConstraintViolationException(name.getString() + "." + column.getName().getString() + " may not be null");
+//                }
+//                Integer	maxLength = column.getMaxLength();
+//                if (maxLength != null && type.isFixedWidth() && byteValue.length <= maxLength) {
+//                    byteValue = StringUtil.padChar(byteValue, maxLength);
+//                } else if (maxLength != null && byteValue.length > maxLength) {
+//                    throw new ConstraintViolationException(name.getString() + "." + column.getName().getString() + " may not exceed " + maxLength + " bytes (" + SchemaUtil.toString(type, byteValue) + ")");
+//                }
+//                os.write(byteValue, 0, byteValue.length);
+//            }
+//            // If some non null pk values aren't set, then throw
+//            if (i < nColumns) {
+//                PColumn column = columns.get(i);
+//                type = column.getDataType();
+//                if (type.isFixedWidth() || !column.isNullable()) {
+//                    throw new ConstraintViolationException(name.getString() + "." + column.getName().getString() + " may not be null");
+//                }
+//            }
+//            if (nValues == 0) {
+//                throw new ConstraintViolationException("Primary key may not be null ("+ name.getString() + ")");
+//            }
+//            byte[] buf = os.getBuffer();
+//            int size = os.size();
+//            if (bucketNum != null) {
+//                buf[0] = SaltingUtil.getSaltingByte(buf, 1, size-1, bucketNum);
+//            }
+//            key.set(buf,0,size);
+//            return i;
         } finally {
             try {
                 os.close();

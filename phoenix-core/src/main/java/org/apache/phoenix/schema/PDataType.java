@@ -29,6 +29,8 @@ import java.text.Format;
 import java.util.Map;
 
 import org.apache.hadoop.hbase.io.ImmutableBytesWritable;
+import org.apache.hadoop.hbase.types.DataType;
+import org.apache.hadoop.hbase.types.KRawString;
 import org.apache.hadoop.hbase.types.OrderedInt64;
 import org.apache.hadoop.hbase.util.*;
 import org.apache.phoenix.exception.ValueTypeIncompatibleException;
@@ -67,7 +69,7 @@ public enum PDataType {
             if (object == null) {
                 return ByteUtil.EMPTY_BYTE_ARRAY;
             }
-            return Bytes.toBytes((String)object);
+            return Bytes.toBytes((String) object);
         }
 
         @Override
@@ -98,12 +100,12 @@ public enum PDataType {
         @Override
         public Object toObject(Object object, PDataType actualType) {
             switch (actualType) {
-            case VARCHAR:
-            case CHAR:
-                String s = (String)object;
-                return s == null || s.length() > 0 ? s : null;
-            default:
-                return throwConstraintViolationException(actualType,this);
+                case VARCHAR:
+                case CHAR:
+                    String s = (String) object;
+                    return s == null || s.length() > 0 ? s : null;
+                default:
+                    return throwConstraintViolationException(actualType, this);
             }
         }
 
@@ -125,7 +127,7 @@ public enum PDataType {
 
         @Override
         public boolean isSizeCompatible(ImmutableBytesWritable ptr, Object value, PDataType srcType,
-                Integer maxLength, Integer scale, Integer desiredMaxLength, Integer desiredScale) {
+                                        Integer maxLength, Integer scale, Integer desiredMaxLength, Integer desiredScale) {
             if (ptr.getLength() != 0 && maxLength != null && desiredMaxLength != null) {
                 return maxLength <= desiredMaxLength;
             }
@@ -150,7 +152,7 @@ public enum PDataType {
 
         @Override
         public int compareTo(Object lhs, Object rhs, PDataType rhsType) {
-            return ((String)lhs).compareTo((String)rhs);
+            return ((String) lhs).compareTo((String) rhs);
         }
 
         @Override
@@ -165,14 +167,19 @@ public enum PDataType {
 
         @Override
         public String toStringLiteral(byte[] b, int offset, int length, Format formatter) {
-            while (b[length-1] == 0) {
+            while (b[length - 1] == 0) {
                 length--;
             }
             if (formatter != null) {
-                Object o = toObject(b,offset,length);
+                Object o = toObject(b, offset, length);
                 return "'" + formatter.format(o) + "'";
             }
             return "'" + Bytes.toStringBinary(b, offset, length) + "'";
+        }
+
+        @Override
+        public DataType getHDataType() {
+            return new KRawString();
         }
     },
     /**
@@ -7368,5 +7375,8 @@ public enum PDataType {
     public Object pad(Object object, int maxLength) {
         return object;
     }
-    
+
+    public DataType getHDataType() {
+        throw new UnsupportedOperationException("Operatio not supported for type " + this);
+    }
 }
