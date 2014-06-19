@@ -39,22 +39,19 @@ import org.junit.runners.Parameterized.Parameters;
 /**
  * This class both tests and demonstrates how to construct compound rowkeys
  * from a POJO. The code under test is {@link Struct}.
- * {@link SpecializedPojo1Type1} demonstrates how one might create their own
- * custom data type extension for an application POJO.
  */
 @RunWith(Parameterized.class)
 @Category(SmallTests.class)
 public class TestKStruct {
 
   private KStruct generic;
-  @SuppressWarnings("rawtypes")
-  private DataType specialized;
+  private Class pojoCls;
   private Object[][] constructorArgs;
 
-  public TestKStruct(KStruct generic, @SuppressWarnings("rawtypes") DataType specialized,
+  public TestKStruct(KStruct generic, Class pojoCls,
                      Object[][] constructorArgs) {
     this.generic = generic;
-    this.specialized = specialized;
+    this.pojoCls = pojoCls;
     this.constructorArgs = constructorArgs;
   }
 
@@ -78,8 +75,8 @@ public class TestKStruct {
     };
 
     Object[][] params = new Object[][] {
-        { SpecializedPojo1Type1.GENERIC, new SpecializedPojo1Type1(), pojo1Args },
-        { SpecializedPojo2Type1.GENERIC, new SpecializedPojo2Type1(), pojo2Args },
+        { GENERIC_POJO1, Pojo1.class, pojo1Args },
+        { GENERIC_POJO2, Pojo2.class, pojo2Args },
     };
     return Arrays.asList(params);
   }
@@ -213,157 +210,38 @@ public class TestKStruct {
     }
   }
 
-  /**
-   * A custom data type implementation specialized for {@link Pojo1}.
-   */
-  private static class SpecializedPojo1Type1 implements DataType<Pojo1> {
-
+    // POJO 1
     private static final KRawString stringField = new KRawString();
     private static final RawInteger intField = new RawInteger();
     private static final RawDouble doubleField = new RawDouble();
+    public static KStruct GENERIC_POJO1 = new KStructBuilder().add(stringField)
+          .add(intField)
+          .add(doubleField)
+          .toStruct();
 
-    /**
-     * The {@link KStruct} equivalent of this type.
-     */
-    public static KStruct GENERIC =
-        new KStructBuilder().add(stringField)
-                           .add(intField)
-                           .add(doubleField)
-                           .toStruct();
 
-    @Override
-    public boolean isOrderPreserving() { return true; }
-
-    @Override
-    public Order getOrder() { return null; }
-
-    @Override
-    public boolean isNullable() { return false; }
-
-    @Override
-    public boolean isSkippable() { return true; }
-
-    @Override
-    public int encodedLength(Pojo1 val) {
-      return
-          stringField.encodedLength(val.stringFieldAsc) +
-          intField.encodedLength(val.intFieldAsc) +
-          doubleField.encodedLength(val.doubleFieldAsc);
-    }
-
-    @Override
-    public Class<Pojo1> encodedClass() { return Pojo1.class; }
-
-    @Override
-    public int skip(PositionedByteRange src) {
-      int skipped = stringField.skip(src);
-      skipped += intField.skip(src);
-      skipped += doubleField.skip(src);
-      return skipped;
-    }
-
-    @Override
-    public Pojo1 decode(PositionedByteRange src) {
-      Object[] ret = new Object[3];
-      ret[0] = stringField.decode(src);
-      ret[1] = intField.decode(src);
-      ret[2] = doubleField.decode(src);
-      return new Pojo1(ret);
-    }
-
-    @Override
-    public int encode(PositionedByteRange dst, Pojo1 val) {
-      int written = stringField.encode(dst, val.stringFieldAsc);
-      written ++ ; // string tag
-      written += intField.encode(dst, val.intFieldAsc);
-      written ++ ; // int tag
-      written += doubleField.encode(dst, val.doubleFieldAsc);
-      written ++ ; // double tag
-      return written;
-    }
-  }
-
-  /**
-   * A custom data type implementation specialized for {@link Pojo2}.
-   */
-  private static class SpecializedPojo2Type1 implements DataType<Pojo2> {
-
+    // POJO 2
     // TODO handle ASC and DESC encodings types.
     private static KByteArray byteField1 = new KByteArray();
     private static KByteArray byteField2 =new KByteArray();
-    private static KRawString stringField = new KRawString();
     private static KByteArray byteField3 = new KByteArray();
-
     /**
      * The {@link Struct} equivalent of this type.
      */
-    public static KStruct GENERIC =
-        new KStructBuilder().add(byteField1)
-                           .add(byteField2)
-                           .add(stringField)
-                           .add(byteField3)
-                           .toStruct();
+    public static KStruct GENERIC_POJO2 =
+            new KStructBuilder().add(byteField1)
+                    .add(byteField2)
+                    .add(stringField)
+                    .add(byteField3)
+                    .toStruct();
 
-    @Override
-    public boolean isOrderPreserving() { return true; }
-
-    @Override
-    public Order getOrder() { return null; }
-
-    @Override
-    public boolean isNullable() { return false; }
-
-    @Override
-    public boolean isSkippable() { return true; }
-
-    @Override
-    public int encodedLength(Pojo2 val) {
-      return
-          byteField1.encodedLength(val.byteField1Asc) +
-          byteField2.encodedLength(val.byteField2Dsc) +
-          stringField.encodedLength(val.stringFieldDsc) +
-          byteField3.encodedLength(val.byteField3Dsc)
-              + 4 ;  // tags
-    }
-
-    @Override
-    public Class<Pojo2> encodedClass() { return Pojo2.class; }
-
-    @Override
-    public int skip(PositionedByteRange src) {
-      int skipped = byteField1.skip(src);
-      skipped += byteField2.skip(src);
-      skipped += stringField.skip(src);
-      skipped += byteField3.skip(src);
-      return skipped;
-    }
-
-    @Override
-    public Pojo2 decode(PositionedByteRange src) {
-      Object[] ret = new Object[4];
-      ret[0] = byteField1.decode(src);
-      ret[1] = byteField2.decode(src);
-      ret[2] = stringField.decode(src);
-      ret[3] = byteField3.decode(src);
-      return new Pojo2(ret);
-    }
-
-    @Override
-    public int encode(PositionedByteRange dst, Pojo2 val) {
-      int written = byteField1.encode(dst, val.byteField1Asc);
-      written += byteField2.encode(dst, val.byteField2Dsc);
-      written += stringField.encode(dst, val.stringFieldDsc);
-      written += byteField3.encode(dst, val.byteField3Dsc);
-      return written;
-    }
-  }
 
   @Test
   @SuppressWarnings("unchecked")
   public void testOrderPreservation() throws Exception {
     Object[] vals = new Object[constructorArgs.length];
     PositionedByteRange[] encodedGeneric = new PositionedByteRange[constructorArgs.length];
-    Constructor<?> ctor = specialized.encodedClass().getConstructor(Object[].class);
+    Constructor<?> ctor = pojoCls.getConstructor(Object[].class);
     for (int i = 0; i < vals.length; i++) {
       vals[i] = ctor.newInstance(new Object[] { constructorArgs[i] });
       encodedGeneric[i] = new SimplePositionedByteRange(generic.encodedLength(constructorArgs[i]));
