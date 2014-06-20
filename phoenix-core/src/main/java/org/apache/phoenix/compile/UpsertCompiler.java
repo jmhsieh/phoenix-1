@@ -18,7 +18,9 @@
 package org.apache.phoenix.compile;
 
 import static com.google.common.collect.Lists.newArrayListWithCapacity;
+import static org.apache.phoenix.query.QueryConstants.SEPARATOR_BYTE;
 
+import java.io.IOException;
 import java.sql.ParameterMetaData;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -65,32 +67,93 @@ import org.apache.phoenix.parse.SelectStatement;
 import org.apache.phoenix.parse.SequenceValueParseNode;
 import org.apache.phoenix.parse.UpsertStatement;
 import org.apache.phoenix.query.ConnectionQueryServices;
+import org.apache.phoenix.query.QueryConstants;
 import org.apache.phoenix.query.QueryServices;
 import org.apache.phoenix.query.QueryServicesOptions;
-import org.apache.phoenix.schema.ColumnRef;
-import org.apache.phoenix.schema.ConstraintViolationException;
-import org.apache.phoenix.schema.PColumn;
-import org.apache.phoenix.schema.PColumnImpl;
-import org.apache.phoenix.schema.PDataType;
-import org.apache.phoenix.schema.PTable;
+import org.apache.phoenix.schema.*;
 import org.apache.phoenix.schema.PTable.ViewType;
-import org.apache.phoenix.schema.PTableImpl;
-import org.apache.phoenix.schema.PTableType;
-import org.apache.phoenix.schema.ReadOnlyTableException;
-import org.apache.phoenix.schema.SortOrder;
-import org.apache.phoenix.schema.TableRef;
-import org.apache.phoenix.schema.TypeMismatchException;
 import org.apache.phoenix.schema.tuple.Tuple;
-import org.apache.phoenix.util.ByteUtil;
-import org.apache.phoenix.util.IndexUtil;
-import org.apache.phoenix.util.MetaDataUtil;
-import org.apache.phoenix.util.SchemaUtil;
+import org.apache.phoenix.util.*;
 
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 
 public class UpsertCompiler {
+
+    private static int generateKey(ImmutableBytesPtr key, PTable t, byte[][] values) {
+        int nValues = values.length;
+        while (nValues > 0 && (values[nValues-1] == null || values[nValues-1].length == 0)) {
+            nValues--;
+        }
+        int i = 0;
+        TrustedByteArrayOutputStream os = new TrustedByteArrayOutputStream(SchemaUtil.estimateKeyLength(t));
+        try {
+            Integer bucketNum = t.getBucketNum();
+            if (bucketNum != null) {
+                // Write place holder for salt byte
+                i++;
+                os.write(QueryConstants.SEPARATOR_BYTE_ARRAY);
+            }
+            List<PColumn> columns = t.getPKColumns();
+            int nColumns = columns.size();
+            PDataType type = null;
+            while (i < nValues && i < nColumns) {
+                // Separate variable length column values in key with zero byte
+                if (type != null && !type.isFixedWidth()) {
+                    os.write(SEPARATOR_BYTE);
+                }
+                PColumn column = columns.get(i);
+                type = column.getDataType();
+                // This will throw if the value is null and the type doesn't allow null
+                byte[] byteValue = values[i++];
+                if (byteValue == null) {
+                    byteValue = ByteUtil.EMPTY_BYTE_ARRAY;
+                }
+                // An empty byte array return value means null. Do this,
+                // since a type may have muliple representations of null.
+                // For example, VARCHAR treats both null and an empty string
+                // as null. This way we don't need to leak that part of the
+                // implementation outside of PDataType by checking the value
+                // here.
+                if (byteValue.length == 0 && !column.isNullable()) {
+                    throw new ConstraintViolationException(t.getName().getString() + "." + column.getName().getString() + " may not be null");
+                }
+                Integer	maxLength = column.getMaxLength();
+                if (maxLength != null && type.isFixedWidth() && byteValue.length <= maxLength) {
+                    byteValue = StringUtil.padChar(byteValue, maxLength);
+                } else if (maxLength != null && byteValue.length > maxLength) {
+                    throw new ConstraintViolationException(t.getName().getString() + "." + column.getName().getString() + " may not exceed " + maxLength + " bytes (" + SchemaUtil.toString(type, byteValue) + ")");
+                }
+                os.write(byteValue, 0, byteValue.length);
+            }
+            // If some non null pk values aren't set, then throw
+            if (i < nColumns) {
+                PColumn column = columns.get(i);
+                type = column.getDataType();
+                if (type.isFixedWidth() || !column.isNullable()) {
+                    throw new ConstraintViolationException(t.getName().getString() + "." + column.getName().getString() + " may not be null");
+                }
+            }
+            if (nValues == 0) {
+                throw new ConstraintViolationException("Primary key may not be null ("+ t.getName().getString() + ")");
+            }
+            byte[] buf = os.getBuffer();
+            int size = os.size();
+            if (bucketNum != null) {
+                buf[0] = SaltingUtil.getSaltingByte(buf, 1, size - 1, bucketNum);
+            }
+            key.set(buf,0,size);
+            return i;
+        } finally {
+            try {
+                os.close();
+            } catch (IOException e) {
+                throw new RuntimeException(e); // Impossible
+            }
+        }
+    }
+
     private static void setValues(byte[][] values, int[] pkSlotIndex, int[] columnIndexes, PTable table, Map<ImmutableBytesPtr,Map<PColumn,byte[]>> mutation) {
         Map<PColumn,byte[]> columnValues = Maps.newHashMapWithExpectedSize(columnIndexes.length);
         byte[][] pkValues = new byte[table.getPKColumns().size()][];
@@ -109,7 +172,7 @@ public class UpsertCompiler {
             }
         }
         ImmutableBytesPtr ptr = new ImmutableBytesPtr();
-        table.newKey(ptr, pkValues);
+        generateKey(ptr, table, pkValues);
         mutation.put(ptr, columnValues);
     }
 
@@ -744,7 +807,7 @@ public class UpsertCompiler {
                     }
                 }
                 ImmutableBytesPtr ptr1 = new ImmutableBytesPtr();
-                table1.newKey(ptr1, pkValues);
+                generateKey(ptr1, table1, pkValues);
                 mutation.put(ptr1, columnValues);
                 return new MutationState(tableRef, mutation, 0, maxSize, connection);
             }
