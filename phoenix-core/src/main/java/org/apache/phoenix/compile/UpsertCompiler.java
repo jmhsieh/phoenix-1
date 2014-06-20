@@ -154,29 +154,7 @@ public class UpsertCompiler {
         }
     }
 
-    private static void setValues(byte[][] values, int[] pkSlotIndex, int[] columnIndexes, PTable table, Map<ImmutableBytesPtr,Map<PColumn,byte[]>> mutation) {
-        Map<PColumn,byte[]> columnValues = Maps.newHashMapWithExpectedSize(columnIndexes.length);
-        byte[][] pkValues = new byte[table.getPKColumns().size()][];
-        // If the table uses salting, the first byte is the salting byte, set to an empty array
-        // here and we will fill in the byte later in PRowImpl.
-        if (table.getBucketNum() != null) {
-            pkValues[0] = new byte[] {0};
-        }
-        for (int i = 0; i < values.length; i++) {
-            byte[] value = values[i];
-            PColumn column = table.getColumns().get(columnIndexes[i]);
-            if (SchemaUtil.isPKColumn(column)) {
-                pkValues[pkSlotIndex[i]] = value;
-            } else {
-                columnValues.put(column, value);
-            }
-        }
-        ImmutableBytesPtr ptr = new ImmutableBytesPtr();
-        generateKey(ptr, table, pkValues);
-        mutation.put(ptr, columnValues);
-    }
-
-    private static MutationState upsertSelect(PhoenixStatement statement, 
+    private static MutationState upsertSelect(PhoenixStatement statement,
             TableRef tableRef, RowProjector projector, ResultIterator iterator, int[] columnIndexes,
             int[] pkSlotIndexes) throws SQLException {
         try {
@@ -215,7 +193,25 @@ public class UpsertCompiler {
                             column.getMaxLength(), column.getScale(), column.getSortOrder());
                     values[i] = ByteUtil.copyKeyBytesIfNecessary(ptr);
                 }
-                setValues(values, pkSlotIndexes, columnIndexes, table, mutation);
+                Map<PColumn,byte[]> columnValues = Maps.newHashMapWithExpectedSize(columnIndexes.length);
+                byte[][] pkValues = new byte[table.getPKColumns().size()][];
+                // If the table uses salting, the first byte is the salting byte, set to an empty array
+                // here and we will fill in the byte later in PRowImpl.
+                if (table.getBucketNum() != null) {
+                    pkValues[0] = new byte[] {0};
+                }
+                for (int i = 0; i < values.length; i++) {
+                    byte[] value = values[i];
+                    PColumn column = table.getColumns().get(columnIndexes[i]);
+                    if (SchemaUtil.isPKColumn(column)) {
+                        pkValues[pkSlotIndexes[i]] = value;
+                    } else {
+                        columnValues.put(column, value);
+                    }
+                }
+                ImmutableBytesPtr ptr1 = new ImmutableBytesPtr();
+                generateKey(ptr1, table, pkValues);
+                mutation.put(ptr1, columnValues);
                 rowCount++;
                 // Commit a batch if auto commit is true and we're at our batch size
                 if (isAutoCommit && rowCount % batchSize == 0) {
