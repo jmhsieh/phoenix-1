@@ -81,9 +81,59 @@ import com.google.common.collect.Sets;
 
 public class UpsertCompiler {
 
-    private static int generateKey(ImmutableBytesPtr key, PTable t, byte[][] values) {
+    /**
+     * Given the specified column, convert the expression to bytes
+     * @param column
+     * @param constantExpression
+     * @return
+     * @throws SQLException
+     */
+    private byte[] toBytes(PColumn column, Expression constantExpression) throws SQLException {
+        if (constantExpression == null) {
+            return null;
+        }
+
+        ImmutableBytesWritable ptr = new ImmutableBytesPtr();
+        constantExpression.evaluate(null, ptr);  // points ptr to value
+
+        Object value = null;
+        if (constantExpression.getDataType() != null) {
+            value = constantExpression.getDataType().toObject(ptr, constantExpression.getSortOrder(), constantExpression.getMaxLength(), constantExpression.getScale());
+            if (!constantExpression.getDataType().isCoercibleTo(column.getDataType(), value)) {
+                throw TypeMismatchException.newException(
+                        constantExpression.getDataType(), column.getDataType(), "expression: "
+                                + constantExpression.toString() + " in column " + column);
+            }
+            if (!column.getDataType().isSizeCompatible(ptr, value, constantExpression.getDataType(),
+                    constantExpression.getMaxLength(), constantExpression.getScale(),
+                    column.getMaxLength(), column.getScale())) {
+                throw new SQLExceptionInfo.Builder(
+                        SQLExceptionCode.DATA_EXCEEDS_MAX_CAPACITY).setColumnName(column.getName().getString())
+                        .setMessage("value=" + constantExpression.toString()).build().buildException();
+            }
+        }
+        column.getDataType().coerceBytes(ptr, value,
+                constantExpression.getDataType(), constantExpression.getMaxLength(), constantExpression.getScale(), constantExpression.getSortOrder(),
+                column.getMaxLength(), column.getScale(),column.getSortOrder());
+        return ByteUtil.copyKeyBytesIfNecessary(ptr);
+    }
+
+    boolean isNull(Expression e, PColumn c) throws SQLException {
+        if (e == null) return true;
+
+        // this interprets and turns empty strings into nulls.
+
+        byte[] val = toBytes(c, e);
+        if (val.length == 0) return true;
+
+        return false;
+    }
+
+    private int generateKey(ImmutableBytesPtr key, PTable t, Expression[] values) throws SQLException {
         int nValues = values.length;
-        while (nValues > 0 && (values[nValues-1] == null || values[nValues-1].length == 0)) {
+        // reduce the number of values if there are trailing null values/expressions
+        // TODO probably remove this.
+        while (nValues > 0 && isNull(values[nValues-1], t.getPKColumns().get(nValues-1))) {
             nValues--;
         }
         int i = 0;
@@ -106,7 +156,7 @@ public class UpsertCompiler {
                 PColumn column = columns.get(i);
                 type = column.getDataType();
                 // This will throw if the value is null and the type doesn't allow null
-                byte[] byteValue = values[i++];
+                byte[] byteValue = toBytes(column, values[i++]);
                 if (byteValue == null) {
                     byteValue = ByteUtil.EMPTY_BYTE_ARRAY;
                 }
@@ -210,7 +260,8 @@ public class UpsertCompiler {
                     }
                 }
                 ImmutableBytesPtr ptr1 = new ImmutableBytesPtr();
-                generateKey(ptr1, table, pkValues);
+                // generateKey(ptr1, table, pkValues);
+                table.newKey(ptr1, pkValues); // original code for now
                 mutation.put(ptr1, columnValues);
                 rowCount++;
                 // Commit a batch if auto commit is true and we're at our batch size
@@ -747,7 +798,8 @@ public class UpsertCompiler {
                     sequenceManager.newSequenceTuple(null);
                 for (Expression constantExpression : constantExpressions) {
                     PColumn column = allColumns.get(columnIndexes[nodeIndex]);
-                    constantExpression.evaluate(tuple, ptr);  // set's value in ptr.
+                    constantExpression.evaluate(tuple, ptr);  // points ptr to value
+
                     Object value = null;
                     if (constantExpression.getDataType() != null) {
                         value = constantExpression.getDataType().toObject(ptr, constantExpression.getSortOrder(), constantExpression.getMaxLength(), constantExpression.getScale());
@@ -764,6 +816,7 @@ public class UpsertCompiler {
                                 .setMessage("value=" + constantExpression.toString()).build().buildException();
                         }
                     }
+                    // coerce java value to expected value type.
                     column.getDataType().coerceBytes(ptr, value,
                             constantExpression.getDataType(), constantExpression.getMaxLength(), constantExpression.getScale(), constantExpression.getSortOrder(),
                             column.getMaxLength(), column.getScale(),column.getSortOrder());
@@ -787,17 +840,18 @@ public class UpsertCompiler {
                 Map<ImmutableBytesPtr, Map<PColumn, byte[]>> mutation = Maps.newHashMapWithExpectedSize(1);
                 PTable table1 = tableRef.getTable();
                 Map<PColumn,byte[]> columnValues = Maps.newHashMapWithExpectedSize(columnIndexes.length);
-                byte[][] pkValues = new byte[table1.getPKColumns().size()][];
+                Expression[] pkValues = new Expression[table1.getPKColumns().size()];
                 // If the table uses salting, the first byte is the salting byte, set to an empty array
                 // here and we will fill in the byte later in PRowImpl.
                 if (table1.getBucketNum() != null) {
-                    pkValues[0] = new byte[] {0};
+                    pkValues[0] = null;
                 }
                 for (int i = 0; i < values.length; i++) {
                     byte[] value = values[i];
                     PColumn column = table1.getColumns().get(columnIndexes[i]);
                     if (SchemaUtil.isPKColumn(column)) {
-                        pkValues[pkSlotIndexes[i]] = value;
+                        Expression constExp = constantExpressions.get(i);
+                        pkValues[pkSlotIndexes[i]] = constExp;
                     } else {
                         columnValues.put(column, value);
                     }
