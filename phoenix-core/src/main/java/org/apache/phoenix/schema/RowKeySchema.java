@@ -124,11 +124,7 @@ public class RowKeySchema extends ValueSchema {
     public int iterator(byte[] src, ImmutableBytesWritable ptr) {
         return iterator(src, 0, src.length, ptr);
     }
-    
-    public int iterator(ImmutableBytesWritable ptr) {
-        return iterator(ptr.get(),ptr.getOffset(),ptr.getLength(), ptr);
-    }
-    
+
     /**
      * Move the bytes ptr to the next position relative to the current ptr
      * @param ptr bytes pointer pointing to the value at the positional index
