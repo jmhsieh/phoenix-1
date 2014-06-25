@@ -278,7 +278,7 @@ public class PhoenixRuntime {
      * Get the list of uncommitted KeyValues for the connection. Currently used to write an
      * Phoenix-compliant HFile from a map/reduce job.
      * @param conn an open JDBC connection
-     * @return the list of HBase mutations for uncommitted data
+     * @return the list of HBase mutations for uncommitted data  (rowkey, KV)?
      * @throws SQLException 
      */
     public static Iterator<Pair<byte[],List<KeyValue>>> getUncommittedDataIterator(Connection conn) throws SQLException {

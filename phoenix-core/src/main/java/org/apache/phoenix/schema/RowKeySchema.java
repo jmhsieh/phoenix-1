@@ -34,7 +34,7 @@ import org.apache.phoenix.query.QueryConstants;
  * write the length of the var char preceding the value. We can't do
  * that for a RowKey because it would affect the sort order.
  *
- * 
+ * TODO this is the row key reader that I replace or gut
  * @since 0.1
  */
 public class RowKeySchema extends ValueSchema {

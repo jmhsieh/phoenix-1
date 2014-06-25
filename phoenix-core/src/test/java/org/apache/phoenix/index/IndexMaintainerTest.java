@@ -113,7 +113,8 @@ public class IndexMaintainerTest  extends BaseConnectionlessQueryTest {
                 stmt.setObject(i+1, values[i]);
             }
             stmt.execute();
-            	Iterator<Pair<byte[],List<KeyValue>>> iterator = PhoenixRuntime.getUncommittedDataIterator(conn);
+
+            Iterator<Pair<byte[],List<KeyValue>>> iterator = PhoenixRuntime.getUncommittedDataIterator(conn);
             List<KeyValue> dataKeyValues = iterator.next().getSecond();
             Map<ColumnReference,byte[]> valueMap = Maps.newHashMapWithExpectedSize(dataKeyValues.size());
             ImmutableBytesWritable rowKeyPtr = new ImmutableBytesWritable(dataKeyValues.get(0).getRow());
