@@ -114,13 +114,15 @@ public class RowKeySchema extends ValueSchema {
     public Boolean iterator(byte[] src, ImmutableBytesWritable ptr, int position) {
         return iterator(src, 0, src.length, ptr, position);
     }
-    
+
+    // TODO seriously, this has the same name as others but different signature.  bad bad bad.
     public int iterator(byte[] src, int srcOffset, int srcLength, ImmutableBytesWritable ptr) {
         int maxOffset = srcOffset + srcLength;
         iterator(src, srcOffset, srcLength, ptr, 0);
         return maxOffset;
     }
-    
+
+    // TODO seriously, this has the same name as others but different signature.  bad bad bad.
     public int iterator(byte[] src, ImmutableBytesWritable ptr) {
         return iterator(src, 0, src.length, ptr);
     }
@@ -170,7 +172,15 @@ public class RowKeySchema extends ValueSchema {
         }
         return ptr.getLength() > 0;
     }
-    
+
+
+    /**
+     * Only used by reposition, which is only usd by skip scan filter
+     * @param ptr
+     * @param position
+     * @param minOffset
+     * @return
+     */
     @edu.umd.cs.findbugs.annotations.SuppressWarnings(
             value="NP_BOOLEAN_RETURN_NULL", 
             justification="Designed to return null.")
@@ -222,6 +232,15 @@ public class RowKeySchema extends ValueSchema {
         return iterator(ptr.get(), minOffset, ptr.getOffset() - minOffset - offsetAdjustment, ptr, position+1);
     }
 
+    /**
+     * Only used by skip scan filter
+     * @param ptr
+     * @param oldPosition
+     * @param newPosition
+     * @param minOffset
+     * @param maxOffset
+     * @return
+     */
     @edu.umd.cs.findbugs.annotations.SuppressWarnings(
             value="NP_BOOLEAN_RETURN_NULL", 
             justification="Designed to return null.")
