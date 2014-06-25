@@ -34,7 +34,12 @@ import java.util.Set;
 import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.client.Scan;
 import org.apache.hadoop.hbase.io.ImmutableBytesWritable;
+import org.apache.hadoop.hbase.types.DataType;
+import org.apache.hadoop.hbase.types.KStruct;
+import org.apache.hadoop.hbase.types.KStructBuilder;
 import org.apache.hadoop.hbase.util.Bytes;
+import org.apache.hadoop.hbase.util.PositionedByteRange;
+import org.apache.hadoop.hbase.util.SimplePositionedByteRange;
 import org.apache.phoenix.cache.ServerCacheClient.ServerCache;
 import org.apache.phoenix.compile.GroupByCompiler.GroupBy;
 import org.apache.phoenix.compile.OrderByCompiler.OrderBy;
@@ -85,7 +90,7 @@ public class UpsertCompiler {
      * Given the specified column, convert the expression to bytes
      * @param column
      * @param constantExpression
-     * @return
+     * @return byte[] of values or null if the value is null
      * @throws SQLException
      */
     private byte[] toBytes(PColumn column, Expression constantExpression) throws SQLException {
@@ -112,10 +117,20 @@ public class UpsertCompiler {
                         .setMessage("value=" + constantExpression.toString()).build().buildException();
             }
         }
-        column.getDataType().coerceBytes(ptr, value,
-                constantExpression.getDataType(), constantExpression.getMaxLength(), constantExpression.getScale(), constantExpression.getSortOrder(),
-                column.getMaxLength(), column.getScale(),column.getSortOrder());
-        return ByteUtil.copyKeyBytesIfNecessary(ptr);
+//        column.getDataType().coerceBytes(ptr, value,
+//                constantExpression.getDataType(), constantExpression.getMaxLength(), constantExpression.getScale(), constantExpression.getSortOrder(),
+//                column.getMaxLength(), column.getScale(),column.getSortOrder());
+
+        if (value == null)
+            return null;
+
+        DataType hdt = column.getDataType().getHDataType();
+        int sz = hdt.encode(null, value);
+        byte[] buf = new byte[sz];
+        PositionedByteRange val = new SimplePositionedByteRange(buf);
+        hdt.encode(val, value);
+
+        return buf;
     }
 
     boolean isNull(Expression e, PColumn c) throws SQLException {
@@ -124,7 +139,7 @@ public class UpsertCompiler {
         // this interprets and turns empty strings into nulls.
 
         byte[] val = toBytes(c, e);
-        if (val.length == 0) return true;
+        if (val == null || val.length == 0) return true;
 
         return false;
     }
@@ -146,47 +161,22 @@ public class UpsertCompiler {
                 os.write(QueryConstants.SEPARATOR_BYTE_ARRAY);
             }
             List<PColumn> columns = t.getPKColumns();
-            int nColumns = columns.size();
-            PDataType type = null;
-            while (i < nValues && i < nColumns) {
-                // Separate variable length column values in key with zero byte
-                if (type != null && !type.isFixedWidth()) {
-                    os.write(SEPARATOR_BYTE);
-                }
-                PColumn column = columns.get(i);
-                type = column.getDataType();
-                // This will throw if the value is null and the type doesn't allow null
-                byte[] byteValue = toBytes(column, values[i++]);
-                if (byteValue == null) {
-                    byteValue = ByteUtil.EMPTY_BYTE_ARRAY;
-                }
-                // An empty byte array return value means null. Do this,
-                // since a type may have muliple representations of null.
-                // For example, VARCHAR treats both null and an empty string
-                // as null. This way we don't need to leak that part of the
-                // implementation outside of PDataType by checking the value
-                // here.
-                if (byteValue.length == 0 && !column.isNullable()) {
-                    throw new ConstraintViolationException(t.getName().getString() + "." + column.getName().getString() + " may not be null");
-                }
-                Integer	maxLength = column.getMaxLength();
-                if (maxLength != null && type.isFixedWidth() && byteValue.length <= maxLength) {
-                    byteValue = StringUtil.padChar(byteValue, maxLength);
-                } else if (maxLength != null && byteValue.length > maxLength) {
-                    throw new ConstraintViolationException(t.getName().getString() + "." + column.getName().getString() + " may not exceed " + maxLength + " bytes (" + SchemaUtil.toString(type, byteValue) + ")");
-                }
-                os.write(byteValue, 0, byteValue.length);
+
+            KStructBuilder builder = new KStructBuilder();
+            byte[][] vals = new byte[values.length][];
+            int j = 0;
+            for (PColumn pcol : columns) {
+                DataType dt = pcol.getDataType().getHDataType();
+                builder.add(dt);
+
+                vals[j] = toBytes(pcol, values[j]);
+                j++;
             }
-            // If some non null pk values aren't set, then throw
-            if (i < nColumns) {
-                PColumn column = columns.get(i);
-                type = column.getDataType();
-                if (type.isFixedWidth() || !column.isNullable()) {
-                    throw new ConstraintViolationException(t.getName().getString() + "." + column.getName().getString() + " may not be null");
-                }
-            }
-            if (nValues == 0) {
-                throw new ConstraintViolationException("Primary key may not be null ("+ t.getName().getString() + ")");
+            KStruct rowStruct = builder.toStruct();
+            try {
+                rowStruct.encodeBytes(os, vals);
+            } catch (IOException ioe) {
+                // TODO handle this
             }
             byte[] buf = os.getBuffer();
             int size = os.size();
