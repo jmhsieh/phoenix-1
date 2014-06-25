@@ -58,6 +58,9 @@ public class OrderedRawInt32 extends OrderedBytesBase<Integer> {
     @Override
     public int encode(PositionedByteRange dst, Integer val) {
         if (null == val) throw new IllegalArgumentException("Null values not supported.");
+        // if no destination, just return size.
+        if (dst == null) return 4;
+
         final int offset = dst.getOffset(), start = dst.getPosition();
         dst     .put((byte) ((val >> 24) ^ 0x80))
                 .put((byte) (val >> 16))
