@@ -71,6 +71,15 @@ public class RowKeySchema extends ValueSchema {
         return this.getMinNullable();
     }
 
+    /**
+     * Gets the position'th field of the rowkey from the src buffer
+     * @param src buffer
+     * @param srcOffset source starting offset
+     * @param srcLength source max len from offset (TODO make sure srcOffse+srcLenght < src.length)
+     * @param ptr return value pointer set to the last point read.
+     * @param position start from this position in the schema struct
+     * @return true if has value, false if no values, null if (?) out of range
+     */
     @edu.umd.cs.findbugs.annotations.SuppressWarnings(
             value="NP_BOOLEAN_RETURN_NULL", 
             justification="Designed to return null.")
@@ -83,11 +92,25 @@ public class RowKeySchema extends ValueSchema {
         }
         return hasValue;
     }
-    
+
+    /**
+     * Gets the position'th field of the rowkey from the src buffer
+     * @param srcPtr src pointer
+     * @param ptr return value pointer set to the last point read.
+     * @param position start from this position in the schema struct
+     * @return true if has value, false if no values, null if (?) out of range
+     */
     public Boolean iterator(ImmutableBytesWritable srcPtr, ImmutableBytesWritable ptr, int position) {
         return iterator(srcPtr.get(), srcPtr.getOffset(), srcPtr.getLength(), ptr, position);
     }
-    
+
+    /**
+     * Gets the position'th field of the rowkey from the src buffer
+     * @param src src buffer
+     * @param ptr return value pointer set to the last point read.
+     * @param position start from this position in the schema struct
+     * @return true if has value, false if no values, null if (?) out of range
+     */
     public Boolean iterator(byte[] src, ImmutableBytesWritable ptr, int position) {
         return iterator(src, 0, src.length, ptr, position);
     }
