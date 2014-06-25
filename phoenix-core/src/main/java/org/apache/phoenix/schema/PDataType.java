@@ -32,6 +32,7 @@ import org.apache.hadoop.hbase.io.ImmutableBytesWritable;
 import org.apache.hadoop.hbase.types.DataType;
 import org.apache.hadoop.hbase.types.KRawString;
 import org.apache.hadoop.hbase.types.OrderedInt64;
+import org.apache.hadoop.hbase.types.OrderedRawInt32;
 import org.apache.hadoop.hbase.util.*;
 import org.apache.phoenix.exception.ValueTypeIncompatibleException;
 import org.apache.phoenix.query.KeyRange;
@@ -829,6 +830,12 @@ public enum PDataType {
             } catch (NumberFormatException e) {
                 throw new IllegalDataException(e);
             }
+        }
+
+        @Override
+        public DataType getHDataType() {
+            // TODO need to handle other orders.
+            return OrderedRawInt32.ASCENDING;
         }
     },
     SMALLINT("SMALLINT", Types.SMALLINT, Short.class, new ShortCodec()){
@@ -3281,6 +3288,13 @@ public enum PDataType {
             buf.setCharAt(buf.length()-1, ']');
             return buf.toString();
         }
+
+
+        @Override
+        public DataType getHDataType() {
+            return new KRawString();
+        }
+
     },
     BINARY("BINARY", Types.BINARY, byte[].class, null) {
         @Override
@@ -3415,6 +3429,12 @@ public enum PDataType {
             }
             return VARBINARY.toStringLiteral(b, offset, length, formatter);
         }
+
+        @Override
+        public DataType getHDataType() {
+            return new KRawString();
+        }
+
     },
     INTEGER_ARRAY("INTEGER_ARRAY", PDataType.ARRAY_TYPE_BASE + PDataType.INTEGER.getSqlType(), PhoenixArray.class, null) {
     	@Override
@@ -7377,6 +7397,6 @@ public enum PDataType {
     }
 
     public DataType getHDataType() {
-        throw new UnsupportedOperationException("Operatio not supported for type " + this);
+        throw new UnsupportedOperationException("Operation not supported for type " + this);
     }
 }
