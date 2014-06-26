@@ -241,10 +241,12 @@ public class SchemaUtil {
         return Bytes.toString(getNameAsBytes(nameOne,nameTwo));
     }
 
+    // Deprecated from index related code
     public static int getVarCharLength(byte[] buf, int keyOffset, int maxLength) {
         return getVarCharLength(buf, keyOffset, maxLength, 1);
     }
 
+    // Deprecated from index related code
     public static int getVarCharLength(byte[] buf, int keyOffset, int maxLength, int skipCount) {
         int length = 0;
         for (int i=0; i<skipCount; i++) {
@@ -258,18 +260,22 @@ public class SchemaUtil {
         return length;
     }
 
+    // Deprecated from index related code
     public static int getVarChars(byte[] rowKey, byte[][] rowKeyMetadata) {
         return getVarChars(rowKey, 0, rowKey.length, 0, rowKeyMetadata);
     }
-    
+
+    // Deprecated from index related code
     public static int getVarChars(byte[] rowKey, int colMetaDataLength, byte[][] colMetaData) {
         return getVarChars(rowKey, 0, rowKey.length, 0, colMetaDataLength, colMetaData);
     }
-    
+
+    // Deprecated from index related code
     public static int getVarChars(byte[] rowKey, int keyOffset, int keyLength, int colMetaDataOffset, byte[][] colMetaData) {
         return getVarChars(rowKey, keyOffset, keyLength, colMetaDataOffset, colMetaData.length, colMetaData);
     }
-    
+
+    // Deprecated from index related code
     public static int getVarChars(byte[] rowKey, int keyOffset, int keyLength, int colMetaDataOffset, int colMetaDataLength, byte[][] colMetaData) {
         int i, offset = keyOffset;
         for (i = colMetaDataOffset; i < colMetaDataLength && keyLength > 0; i++) {

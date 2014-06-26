@@ -75,7 +75,7 @@ public class IndexTestUtil {
     
     private static void coerceDataValueToIndexValue(PColumn dataColumn, PColumn indexColumn, ImmutableBytesWritable ptr) {
         PDataType dataType = dataColumn.getDataType();
-        // TODO: push to RowKeySchema? 
+        // TODO: push to RowKeySchema? yes, do that.
         SortOrder dataModifier = dataColumn.getSortOrder();
         PDataType indexType = indexColumn.getDataType();
         SortOrder indexModifier = indexColumn.getSortOrder();
@@ -94,6 +94,19 @@ public class IndexTestUtil {
         return indexMutations;
     }
 
+    /**
+     * Creates mutations bound for the index table based on primary table edits.
+     *
+     * TODO hack this to fix indexes
+     *
+     * @param indexTable
+     * @param dataTable
+     * @param dataMutation
+     * @param ptr
+     * @param builder
+     * @return
+     * @throws SQLException
+     */
     public static List<Mutation> generateIndexData(PTable indexTable, PTable dataTable,
             Mutation dataMutation, ImmutableBytesWritable ptr, KeyValueBuilder builder)
             throws SQLException {
