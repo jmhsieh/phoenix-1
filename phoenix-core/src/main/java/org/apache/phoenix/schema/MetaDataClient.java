@@ -504,6 +504,7 @@ public class MetaDataClient {
      * 1) Change the type of any columns being indexed to types that support null if the column is nullable.
      *    For example, a BIGINT type would be coerced to a DECIMAL type, since a DECIMAL type supports null
      *    when it's in the row key while a BIGINT does not.
+     *    TODO - with new encoding this is not needed
      * 2) Append any row key column from the data table that is not in the indexed column list. Our indexes
      *    rely on having a 1:1 correspondence between the index and data rows.
      * 3) Change the name of the columns to include the column family. For example, if you have a column
