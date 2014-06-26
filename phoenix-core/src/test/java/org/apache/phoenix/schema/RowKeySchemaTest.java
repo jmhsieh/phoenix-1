@@ -104,40 +104,49 @@ public class RowKeySchemaTest  extends BaseConnectionlessQueryTest  {
                 break;
             }
         }
+
         int i = 0;
-        int maxOffset = schema.iterator(keyValue.getRowArray(), minOffset, keyValue.getRowLength(), ptr);
-        for (i = 0; i < schema.getFieldCount(); i++) {
-            Boolean hasValue = schema.next(ptr, i, maxOffset);
-            if (hasValue == null) {
-                break;
-            }
-            assertTrue(hasValue);
-            PDataType type = PDataType.fromLiteral(values[i]);
-            SortOrder sortOrder = sortOrders.get(i);
-            Object value = type.toObject(ptr, schema.getField(i).getDataType(), sortOrder);
+        Iterator<Object> it = schema.iteratorFor(keyValue.getRowArray(), keyValue.getRowOffset(), keyValue.getRowLength());
+        while (it.hasNext()) {
+            Object value = it.next();
             assertEquals(values[i], value);
+            i++;
         }
-        assertEquals(nExpectedValues, i);
-        assertNull(schema.next(ptr, i, maxOffset));
+
+//        int i = 0;
+//        int maxOffset = schema.iterator(keyValue.getRowArray(), minOffset, keyValue.getRowLength(), ptr);
+//        for (i = 0; i < schema.getFieldCount(); i++) {
+//            Boolean hasValue = schema.next(ptr, i, maxOffset);
+//            if (hasValue == null) {
+//                break;
+//            }
+//            assertTrue(hasValue);
+//            PDataType type = PDataType.fromLiteral(values[i]);
+//            SortOrder sortOrder = sortOrders.get(i);
+//            Object value = type.toObject(ptr, schema.getField(i).getDataType(), sortOrder);
+//            assertEquals(values[i], value);
+//        }
+//        assertEquals(nExpectedValues, i);
+//        assertNull(schema.next(ptr, i, maxOffset));
         
-        for (i--; i >= 0; i--) {
-            Boolean hasValue = schema.previous(ptr, i, minOffset);
-            if (hasValue == null) {
-                break;
-            }
-            assertTrue(hasValue);
-            PDataType type = PDataType.fromLiteral(values[i]);
-            SortOrder sortOrder = sortOrders.get(i);
-            Object value = type.toObject(ptr, schema.getField(i).getDataType(), sortOrder);
-            assertEquals(values[i], value);
-        }
-        assertEquals(-1, i);
-        assertNull(schema.previous(ptr, i, minOffset));
+//        for (i--; i >= 0; i--) {
+//            Boolean hasValue = schema.previous(ptr, i, minOffset);
+//            if (hasValue == null) {
+//                break;
+//            }
+//            assertTrue(hasValue);
+//            PDataType type = PDataType.fromLiteral(values[i]);
+//            SortOrder sortOrder = sortOrders.get(i);
+//            Object value = type.toObject(ptr, schema.getField(i).getDataType(), sortOrder);
+//            assertEquals(values[i], value);
+//        }
+//        assertEquals(-1, i);
+//        assertNull(schema.previous(ptr, i, minOffset));
      }
     
     @Test
     public void testFixedLengthValueAtEnd() throws Exception {
-        assertExpectedRowKeyValue("n VARCHAR NOT NULL, s CHAR(1) NOT NULL, y SMALLINT NOT NULL, o BIGINT NOT NULL", "n,s,y DESC,o DESC", new Object[] {"Abbey","F",2012,253});
+        assertExpectedRowKeyValue("n VARCHAR NOT NULL, s CHAR(1) NOT NULL, y SMALLINT NOT NULL, o BIGINT NOT NULL", "n,s,y DESC,o DESC", new Object[] {"Abbey","F",2012,253L});
     }
     
     @Test
@@ -147,7 +156,7 @@ public class RowKeySchemaTest  extends BaseConnectionlessQueryTest  {
     
     @Test
     public void testFixedFixedVar() throws Exception {
-        assertExpectedRowKeyValue("c1 INTEGER NOT NULL, c2 BIGINT NOT NULL, c3 VARCHAR", "c1, c2, c3", new Object[] {1, 2, "abc"});
+        assertExpectedRowKeyValue("c1 INTEGER NOT NULL, c2 BIGINT NOT NULL, c3 VARCHAR", "c1, c2, c3", new Object[] {1, 2L, "abc"});
     }
     
     @Test

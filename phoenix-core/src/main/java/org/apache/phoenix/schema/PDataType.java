@@ -29,10 +29,7 @@ import java.text.Format;
 import java.util.Map;
 
 import org.apache.hadoop.hbase.io.ImmutableBytesWritable;
-import org.apache.hadoop.hbase.types.DataType;
-import org.apache.hadoop.hbase.types.KRawString;
-import org.apache.hadoop.hbase.types.OrderedInt64;
-import org.apache.hadoop.hbase.types.OrderedRawInt32;
+import org.apache.hadoop.hbase.types.*;
 import org.apache.hadoop.hbase.util.*;
 import org.apache.phoenix.exception.ValueTypeIncompatibleException;
 import org.apache.phoenix.query.KeyRange;
@@ -335,6 +332,12 @@ public enum PDataType {
         public String toStringLiteral(byte[] b, int offset, int length, Format formatter) {
             return VARCHAR.toStringLiteral(b, offset, length, formatter);
         }
+
+        @Override
+        public DataType getHDataType() {
+            return OrderedRawInt8.ASCENDING;
+        }
+
     },
 //    LONG("BIGINT", Types.BIGINT, Long.class, new LongCodec()) {
 //        @Override
@@ -698,6 +701,12 @@ public enum PDataType {
                 throw new IllegalDataException(e);
             }
         }
+
+        @Override
+        public DataType getHDataType() {
+            return OrderedRawInt64.ASCENDING;
+        }
+
     },
     INTEGER("INTEGER", Types.INTEGER, Integer.class, new IntCodec()) {
         @Override

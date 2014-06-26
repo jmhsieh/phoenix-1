@@ -257,9 +257,11 @@ public class KStruct implements DataType<Object[]> {
                   rawSize = RawSize.RLZBYTESDESC;
                   break;
           }
+      } else if (t instanceof OrderedRawInt8) {
+          rawSize = RawSize.INT8;
       } else if (t instanceof RawInteger || t instanceof OrderedRawInt32) {
           rawSize = RawSize.INT32;
-      } else if (t instanceof RawLong) {
+      } else if (t instanceof RawLong || t instanceof OrderedRawInt64) {
           rawSize = RawSize.INT64;
       } else if (t instanceof RawDouble) {
           rawSize = RawSize.INT64;
