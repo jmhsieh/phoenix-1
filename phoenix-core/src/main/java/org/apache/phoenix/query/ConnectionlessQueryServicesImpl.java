@@ -35,8 +35,12 @@ import org.apache.hadoop.hbase.client.HBaseAdmin;
 import org.apache.hadoop.hbase.client.HTableInterface;
 import org.apache.hadoop.hbase.client.Mutation;
 import org.apache.hadoop.hbase.io.ImmutableBytesWritable;
+import org.apache.hadoop.hbase.types.KRawString;
+import org.apache.hadoop.hbase.types.KStruct;
+import org.apache.hadoop.hbase.types.KStructBuilder;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.util.Pair;
+import org.apache.hadoop.hbase.util.SimplePositionedByteRange;
 import org.apache.phoenix.compile.MutationPlan;
 import org.apache.phoenix.coprocessor.MetaDataProtocol;
 import org.apache.phoenix.coprocessor.MetaDataProtocol.MetaDataMutationResult;
@@ -283,17 +287,40 @@ public class ConnectionlessQueryServicesImpl extends DelegateQueryServices imple
 
     @Override
     public MetaDataMutationResult updateIndexState(List<Mutation> tableMetadata, String parentTableName) throws SQLException {
-        byte[][] rowKeyMetadata = new byte[3][];
-        SchemaUtil.getVarChars(tableMetadata.get(0).getRow(), rowKeyMetadata);
+        // byte[][] rowKeyMetadata = new byte[3][];
+
+
+        byte[] row = tableMetadata.get(0).getRow();
+        KStructBuilder builder = new KStructBuilder().add(new KRawString())
+                .add(new KRawString()).add(new KRawString());
+        KStruct threeVarChars = builder.toStruct();
+        Object[] rowKeyMetadata = threeVarChars.decode(new SimplePositionedByteRange(row));
+
+        // SchemaUtil.getVarChars(tableMetadata.get(0).getRow(), rowKeyMetadata);
         Mutation m = MetaDataUtil.getTableHeaderRow(tableMetadata);
         ImmutableBytesWritable ptr = new ImmutableBytesWritable();
         if (!MetaDataUtil.getMutationValue(m, INDEX_STATE_BYTES, kvBuilder, ptr)) {
             throw new IllegalStateException();
         }
         PIndexState newState =  PIndexState.fromSerializedValue(ptr.get()[ptr.getOffset()]);
-        byte[] tenantIdBytes = rowKeyMetadata[PhoenixDatabaseMetaData.TENANT_ID_INDEX];
-        String schemaName = Bytes.toString(rowKeyMetadata[PhoenixDatabaseMetaData.SCHEMA_NAME_INDEX]);
-        String indexName = Bytes.toString(rowKeyMetadata[PhoenixDatabaseMetaData.TABLE_NAME_INDEX]);
+//        byte[] tenantIdBytes = rowKeyMetadata[PhoenixDatabaseMetaData.TENANT_ID_INDEX];
+//        String schemaName = Bytes.toString(rowKeyMetadata[PhoenixDatabaseMetaData.SCHEMA_NAME_INDEX]);
+//        String indexName = Bytes.toString(rowKeyMetadata[PhoenixDatabaseMetaData.TABLE_NAME_INDEX]);
+
+        byte[] tenantIdBytes = new byte[0];
+        if (rowKeyMetadata[PhoenixDatabaseMetaData.TENANT_ID_INDEX] != null) {
+            tenantIdBytes = Bytes.toBytes(rowKeyMetadata[PhoenixDatabaseMetaData.TENANT_ID_INDEX].toString());
+        }
+
+        String schemaName = "";
+        if (rowKeyMetadata[PhoenixDatabaseMetaData.SCHEMA_NAME_INDEX] != null) {
+            schemaName = rowKeyMetadata[PhoenixDatabaseMetaData.SCHEMA_NAME_INDEX].toString();
+        }
+
+        String indexName = "";
+        if (rowKeyMetadata[PhoenixDatabaseMetaData.TABLE_NAME_INDEX] != null) {
+            indexName = rowKeyMetadata[PhoenixDatabaseMetaData.TABLE_NAME_INDEX].toString();
+        }
         String indexTableName = SchemaUtil.getTableName(schemaName, indexName);
         PName tenantId = tenantIdBytes.length == 0 ? null : PNameFactory.newName(tenantIdBytes);
         PTable index = metaData.getTable(new PTableKey(tenantId, indexTableName));

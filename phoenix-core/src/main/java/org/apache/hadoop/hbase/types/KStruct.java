@@ -18,6 +18,7 @@
 package org.apache.hadoop.hbase.types;
 
 import java.io.ByteArrayOutputStream;
+import java.io.DataOutputStream;
 import java.io.IOException;
 import java.util.Iterator;
 
@@ -221,7 +222,7 @@ public class KStruct implements DataType<Object[]> {
      * @param encVals already encoded values.
      * @return
      */
-    public int encodeBytes(ByteArrayOutputStream dst, byte[][] encVals) throws IOException {
+    public int encodeBytes(DataOutputStream dst, byte[][] encVals) throws IOException {
       if (encVals.length == 0) return 0;
       assert fields.length >= encVals.length;
       int end, written = 0;

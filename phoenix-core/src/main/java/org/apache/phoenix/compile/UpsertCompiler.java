@@ -20,6 +20,7 @@ package org.apache.phoenix.compile;
 import static com.google.common.collect.Lists.newArrayListWithCapacity;
 import static org.apache.phoenix.query.QueryConstants.SEPARATOR_BYTE;
 
+import java.io.DataOutputStream;
 import java.io.IOException;
 import java.sql.ParameterMetaData;
 import java.sql.ResultSet;
@@ -174,7 +175,7 @@ public class UpsertCompiler {
             }
             KStruct rowStruct = builder.toStruct();
             try {
-                rowStruct.encodeBytes(os, vals);
+                rowStruct.encodeBytes(new DataOutputStream(os), vals);
             } catch (IOException ioe) {
                 // TODO handle this
             }

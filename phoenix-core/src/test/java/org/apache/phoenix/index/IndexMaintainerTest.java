@@ -133,9 +133,9 @@ public class IndexMaintainerTest  extends BaseConnectionlessQueryTest {
             ImmutableBytesWritable indexKeyPtr = new ImmutableBytesWritable(indexMutation.getRow());
             
             ptr.set(rowKeyPtr.get(), rowKeyPtr.getOffset(), rowKeyPtr.getLength());
-            byte[] mutablelndexRowKey = im1.buildRowKey(valueGetter, ptr);
+            byte[] mutableIndexRowKey = im1.buildRowKey(valueGetter, ptr);
             byte[] immutableIndexRowKey = indexKeyPtr.copyBytes();
-            assertArrayEquals(immutableIndexRowKey, mutablelndexRowKey);
+            assertArrayEquals(immutableIndexRowKey, mutableIndexRowKey);
             
             for (ColumnReference ref : im1.getCoverededColumns()) {
                 valueMap.get(ref);
@@ -155,7 +155,7 @@ public class IndexMaintainerTest  extends BaseConnectionlessQueryTest {
     }
  
     @Test
-    public void testVarFixedndex() throws Exception {
+    public void testVarFixedIndex() throws Exception {
         testIndexRowKeyBuilding("k1 VARCHAR, k2 INTEGER NOT NULL, v VARCHAR", "k1,k2", "k2, k1", new Object [] {"a",1.1});
     }
  

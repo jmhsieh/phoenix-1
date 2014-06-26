@@ -22,6 +22,7 @@ import static org.apache.phoenix.hbase.index.util.KeyValueBuilder.deleteQuietly;
 import static org.apache.phoenix.query.QueryConstants.SEPARATOR_BYTE;
 import static org.apache.phoenix.schema.SaltingUtil.SALTING_COLUMN;
 
+import java.io.DataOutputStream;
 import java.io.IOException;
 import java.sql.SQLException;
 import java.util.ArrayList;
@@ -435,7 +436,7 @@ public class PTableImpl implements PTable {
             KStruct rowStruct = builder.toStruct();
 
             try {
-                rowStruct.encodeBytes(os, values);
+                rowStruct.encodeBytes(new DataOutputStream(os), values);
             } catch (IOException ioe) {
                 // TODO handle this
             }

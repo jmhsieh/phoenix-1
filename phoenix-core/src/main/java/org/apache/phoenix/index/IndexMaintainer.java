@@ -38,7 +38,12 @@ import org.apache.hadoop.hbase.client.Delete;
 import org.apache.hadoop.hbase.client.Durability;
 import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.io.ImmutableBytesWritable;
+import org.apache.hadoop.hbase.types.DataType;
+import org.apache.hadoop.hbase.types.KStruct;
+import org.apache.hadoop.hbase.types.KStructBuilder;
 import org.apache.hadoop.hbase.util.Bytes;
+import org.apache.hadoop.hbase.util.PositionedByteRange;
+import org.apache.hadoop.hbase.util.SimplePositionedByteRange;
 import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.io.WritableUtils;
 import org.apache.phoenix.hbase.index.ValueGetter;
@@ -274,7 +279,7 @@ public class IndexMaintainer implements Writable, Iterable<ColumnReference> {
     public byte[] buildRowKey(ValueGetter valueGetter, ImmutableBytesWritable rowKeyPtr)  {
         ImmutableBytesWritable ptr = new ImmutableBytesWritable();
         TrustedByteArrayOutputStream stream = new TrustedByteArrayOutputStream(estimatedIndexRowKeyBytes);
-        DataOutput output = new DataOutputStream(stream);
+        DataOutputStream output = new DataOutputStream(stream);
         try {
             if (nIndexSaltBuckets > 0) {
                 output.write(0); // will be set at end to index salt byte
@@ -301,78 +306,117 @@ public class IndexMaintainer implements Writable, Iterable<ColumnReference> {
             
             BitSet viewConstantColumnBitSet = this.rowKeyMetaData.getViewConstantColumnBitSet();
             // Write index row key
+            Iterator<Object> rkIt = dataRowKeySchema.iteratorFor(rowKeyPtr.get(), rowKeyPtr.getOffset(), rowKeyPtr.getLength());
+            Object[] rkVals = new Object[dataRowKeySchema.getFieldCount()];
             for (int i = dataPosOffset; i < dataRowKeySchema.getFieldCount(); i++) {
-                Boolean hasValue=dataRowKeySchema.next(ptr, i, maxRowKeyOffset);
+                boolean hasNext = rkIt.hasNext();
                 // Ignore view constants from the data table, as these
                 // don't need to appear in the index (as they're the
                 // same for all rows in this index)
                 if (!viewConstantColumnBitSet.get(i)) {
-                    int pos = rowKeyMetaData.getIndexPkPosition(i-dataPosOffset);
-                    if (Boolean.TRUE.equals(hasValue)) {
-                        dataRowKeyLocator[0][pos] = ptr.getOffset();
-                        dataRowKeyLocator[1][pos] = ptr.getLength();
-                    } else {
-                        dataRowKeyLocator[0][pos] = 0;
-                        dataRowKeyLocator[1][pos] = 0;
-                    }
+//                    int pos = rowKeyMetaData.getIndexPkPosition(i-dataPosOffset);
+                      rkVals[i] = rkIt.next();
                 }
+
+                // TODO this calculates the breaks incorrectly
+//                Boolean hasValue=dataRowKeySchema.next(ptr, i, maxRowKeyOffset);
+//                // Ignore view constants from the data table, as these
+//                // don't need to appear in the index (as they're the
+//                // same for all rows in this index)
+//                if (!viewConstantColumnBitSet.get(i)) {
+//                    int pos = rowKeyMetaData.getIndexPkPosition(i-dataPosOffset);
+//                    if (Boolean.TRUE.equals(hasValue)) {
+//                        dataRowKeyLocator[0][pos] = ptr.getOffset();
+//                        dataRowKeyLocator[1][pos] = ptr.getLength();
+//                    } else {
+//                        dataRowKeyLocator[0][pos] = 0;
+//                        dataRowKeyLocator[1][pos] = 0;
+//                    }
+//                }
             }
             BitSet descIndexColumnBitSet = rowKeyMetaData.getDescIndexColumnBitSet();
             int j = 0;
             Iterator<ColumnReference> iterator = indexedColumns.iterator();
+            KStructBuilder builder = new KStructBuilder();
+            byte[][] values = new byte[nIndexedColumns][];
             for (int i = 0; i < nIndexedColumns; i++) {
                 PDataType dataColumnType;
                 boolean isNullable = true;
                 boolean isDataColumnInverted = false;
                 SortOrder dataSortOrder = SortOrder.getDefault();
+                Object v;
                 if (dataPkPosition[i] == -1) {
+                    // column value -- interpret using phoenix native
                     dataColumnType = indexedColumnTypes.get(j);
                     ImmutableBytesPtr value = valueGetter.getLatestValue(iterator.next());
                     if (value == null) {
-                        ptr.set(ByteUtil.EMPTY_BYTE_ARRAY);
+                        v = null;
+//                        ptr.set(ByteUtil.EMPTY_BYTE_ARRAY);
                     } else {
-                        ptr.set(value.copyBytesIfNecessary());
+                        v = dataColumnType.toObject(value);
+//                        ptr.set(value.copyBytesIfNecessary());
                     }
                     j++;
                } else {
+                    // rowkey value -- interpret using new encoding.
                     Field field = dataRowKeySchema.getField(dataPkPosition[i]);
                     dataColumnType = field.getDataType();
-                    ptr.set(rowKeyPtr.get(), dataRowKeyLocator[0][i], dataRowKeyLocator[1][i]);
+//                    ptr.set(rowKeyPtr.get(), dataRowKeyLocator[0][i], dataRowKeyLocator[1][i]);
+                    // skip tag value
+//                    v = dataColumnType.toObject(rowKeyPtr.get(), dataRowKeyLocator[0][i], dataRowKeyLocator[1][i]);
+                    v = rkVals[dataPkPosition[i]];
                     dataSortOrder = field.getSortOrder();
                     isDataColumnInverted = dataSortOrder != SortOrder.ASC;
                     isNullable = field.isNullable();
                 }
+
+                // TODO here the index key gets built.  Need to convert this to new format.
                 PDataType indexColumnType = IndexUtil.getIndexColumnDataType(isNullable, dataColumnType);
-                boolean isBytesComparable = dataColumnType.isBytesComparableWith(indexColumnType) ;
-                if (isBytesComparable && isDataColumnInverted == descIndexColumnBitSet.get(i)) {
-                    output.write(ptr.get(), ptr.getOffset(), ptr.getLength());
-                } else {
-                    if (!isBytesComparable)  {
-                        indexColumnType.coerceBytes(ptr, dataColumnType, dataSortOrder, SortOrder.getDefault());
-                    }
-                    if (descIndexColumnBitSet.get(i) != isDataColumnInverted) {
-                        writeInverted(ptr.get(), ptr.getOffset(), ptr.getLength(), output);
-                    } else {
-                        output.write(ptr.get(), ptr.getOffset(), ptr.getLength());
-                    }
-                }
-                if (!indexColumnType.isFixedWidth()) {
-                    output.writeByte(QueryConstants.SEPARATOR_BYTE);
-                }
+                DataType hdt = indexColumnType.getHDataType();
+                builder.add(hdt);
+
+                int sz = hdt.encode(null, v);
+                byte[] buf = new byte[sz];
+                PositionedByteRange val = new SimplePositionedByteRange(buf);
+                hdt.encode(val, v);
+                values[i] = buf;
+
+//                boolean isBytesComparable = dataColumnType.isBytesComparableWith(indexColumnType) ;
+//                if (isBytesComparable && isDataColumnInverted == descIndexColumnBitSet.get(i)) {
+//                    output.write(ptr.get(), ptr.getOffset(), ptr.getLength());
+//                } else {
+//                    if (!isBytesComparable)  {
+//                        indexColumnType.coerceBytes(ptr, dataColumnType, dataSortOrder, SortOrder.getDefault());
+//                    }
+//                    if (descIndexColumnBitSet.get(i) != isDataColumnInverted) {
+//                        writeInverted(ptr.get(), ptr.getOffset(), ptr.getLength(), output);
+//                    } else {
+//                        output.write(ptr.get(), ptr.getOffset(), ptr.getLength());
+//                    }
+//                }
+//                if (!indexColumnType.isFixedWidth()) {
+//                    output.writeByte(QueryConstants.SEPARATOR_BYTE);
+//                }
             }
-            int length = stream.size();
-            int minLength = length - maxTrailingNulls;
+//            int length = stream.size();
+//            int minLength = length - maxTrailingNulls;
+//            byte[] indexRowKey = stream.getBuffer();
+//            // Remove trailing nulls
+//            while (length > minLength && indexRowKey[length-1] == QueryConstants.SEPARATOR_BYTE) {
+//                length--;
+//            }
+            KStruct struct = builder.toStruct();
+//            int sz = struct.encodeBytes(null, values);
+//            byte[] indexRowKey = new byte[sz];
+            int sz = struct.encodeBytes(output, values);
             byte[] indexRowKey = stream.getBuffer();
-            // Remove trailing nulls
-            while (length > minLength && indexRowKey[length-1] == QueryConstants.SEPARATOR_BYTE) {
-                length--;
-            }
+
             if (nIndexSaltBuckets > 0) {
                 // Set salt byte
-                byte saltByte = SaltingUtil.getSaltingByte(indexRowKey, SaltingUtil.NUM_SALTING_BYTES, length-SaltingUtil.NUM_SALTING_BYTES, nIndexSaltBuckets);
+                byte saltByte = SaltingUtil.getSaltingByte(indexRowKey, SaltingUtil.NUM_SALTING_BYTES, sz-SaltingUtil.NUM_SALTING_BYTES, nIndexSaltBuckets);
                 indexRowKey[0] = saltByte;
             }
-            return indexRowKey.length == length ? indexRowKey : Arrays.copyOf(indexRowKey, length);
+            return indexRowKey.length == sz ? indexRowKey : Arrays.copyOf(indexRowKey, sz);
         } catch (IOException e) {
             throw new RuntimeException(e); // Impossible
         } finally {
