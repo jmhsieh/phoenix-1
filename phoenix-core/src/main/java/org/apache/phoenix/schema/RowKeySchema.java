@@ -20,10 +20,15 @@ package org.apache.phoenix.schema;
 import static org.apache.phoenix.query.QueryConstants.SEPARATOR_BYTE;
 
 import java.util.Collections;
+import java.util.Iterator;
 import java.util.List;
 
 import org.apache.hadoop.hbase.io.ImmutableBytesWritable;
 
+import org.apache.hadoop.hbase.types.KStruct;
+import org.apache.hadoop.hbase.types.KStructBuilder;
+import org.apache.hadoop.hbase.util.PositionedByteRange;
+import org.apache.hadoop.hbase.util.SimplePositionedByteRange;
 import org.apache.phoenix.query.QueryConstants;
 
 
@@ -35,6 +40,7 @@ import org.apache.phoenix.query.QueryConstants;
  * that for a RowKey because it would affect the sort order.
  *
  * TODO this is the row key reader that I replace or gut
+ *
  * @since 0.1
  */
 public class RowKeySchema extends ValueSchema {
@@ -75,7 +81,7 @@ public class RowKeySchema extends ValueSchema {
      * Gets the position'th field of the rowkey from the src buffer
      * @param src buffer
      * @param srcOffset source starting offset
-     * @param srcLength source max len from offset (TODO make sure srcOffse+srcLenght < src.length)
+     * @param srcLength source max len from offset (TODO make sure srcOffset+srcLength < src.length)
      * @param ptr return value pointer set to the last point read.
      * @param position start from this position in the schema struct
      * @return true if has value, false if no values, null if (?) out of range
@@ -151,6 +157,7 @@ public class RowKeySchema extends ValueSchema {
         // to 0 to ensure you never set the ptr past the end of the
         // backing byte array.
         ptr.set(ptr.get(), ptr.getOffset() + ptr.getLength(), 0);
+
         // If positioned at SEPARATOR_BYTE, skip it.
         if (position > 0 && !getField(position-1).getDataType().isFixedWidth()) {
             ptr.set(ptr.get(), ptr.getOffset()+ptr.getLength()+1, 0);
@@ -275,5 +282,54 @@ public class RowKeySchema extends ValueSchema {
         }
         
         return hasValue;
+    }
+
+    /**
+     * Creates a java-style iterator to march through translating an encoded rowkey.  The iterator is not thread safe.
+     * @param ptr
+     * @param off
+     * @param len
+     * @return
+     */
+    public Iterator<Object> iteratorFor(final byte[] buf, final int off, final int len) {
+        return new Iterator<Object>() {
+            RowKeySchema schema = RowKeySchema.this;
+            int pos = 0;
+            KStruct struct = null;
+            Object[] vals = null;
+
+            {
+                KStructBuilder builder = new KStructBuilder();
+                for (int i=0; i < schema.getFieldCount(); i++) {
+                    Field f = schema.getField(i);
+                    builder.add(f.getDataType().getHDataType());
+                }
+                struct = builder.toStruct();
+                PositionedByteRange pbr = new SimplePositionedByteRange(buf, off, len);
+                vals = struct.decode(pbr);
+            }
+
+
+            @Override
+            public boolean hasNext() {
+                return pos < vals.length;
+            }
+
+            @Override
+            public Object next() {
+                if (pos >= schema.getFieldCount()) {
+                    return null;
+                }
+
+                // client will assume that null means end.  need to return null place holder if it is actually
+                // a null object.
+                return vals[pos++];
+            }
+
+            @Override
+            public void remove() {
+                throw  new UnsupportedOperationException("Row Key iterator does not support remove()");
+            }
+        };
     }
 }
