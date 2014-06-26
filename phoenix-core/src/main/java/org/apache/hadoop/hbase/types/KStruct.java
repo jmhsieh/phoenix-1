@@ -231,7 +231,7 @@ public class KStruct implements DataType<Object[]> {
       for (end = encVals.length - 1; end > -1; end--) {
           if (null != encVals[end] || (null == encVals[end] && !fields[end].isNullable())) break;
       }
-      for (int i = 0; i < end; i++) {
+      for (int i = 0; i <= end; i++) {
           if (encVals[i] == null) {
               // skip null values
               continue;
