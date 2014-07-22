@@ -85,13 +85,15 @@ public class RowKeySchema extends ValueSchema {
      * @param ptr return value pointer set to the last point read.
      * @param position start from this position in the schema struct
      * @return true if has value, false if no values, null if (?) out of range
+     *
+     * TODO need to just dep
      */
     @edu.umd.cs.findbugs.annotations.SuppressWarnings(
             value="NP_BOOLEAN_RETURN_NULL", 
             justification="Designed to return null.")
     public Boolean iterator(byte[] src, int srcOffset, int srcLength, ImmutableBytesWritable ptr, int position) {
         Boolean hasValue = null;
-        ptr.set(src, srcOffset, 0);
+        ptr.set(src, srcOffset, srcLength); // Why was this 0?  that is just wrong!
         int maxOffset = srcOffset + srcLength;
         for (int i = 0; i < position; i++) {
             hasValue = next(ptr, i, maxOffset);
@@ -145,6 +147,7 @@ public class RowKeySchema extends ValueSchema {
     @edu.umd.cs.findbugs.annotations.SuppressWarnings(
             value="NP_BOOLEAN_RETURN_NULL", 
             justification="Designed to return null.")
+    @Deprecated // this assumes null separated rowkey, we now use KStruct to generate row keys.
     public Boolean next(ImmutableBytesWritable ptr, int position, int maxOffset) {
         if (ptr.getOffset() + ptr.getLength() >= maxOffset) {
             ptr.set(ptr.get(), maxOffset, 0);
@@ -286,7 +289,7 @@ public class RowKeySchema extends ValueSchema {
 
     /**
      * Creates a java-style iterator to march through translating an encoded rowkey.  The iterator is not thread safe.
-     * @param ptr
+     * @param buf
      * @param off
      * @param len
      * @return

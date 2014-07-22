@@ -30,6 +30,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.BitSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
@@ -37,7 +38,10 @@ import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.client.Delete;
 import org.apache.hadoop.hbase.client.Mutation;
 import org.apache.hadoop.hbase.io.ImmutableBytesWritable;
+import org.apache.hadoop.hbase.types.DataType;
 import org.apache.hadoop.hbase.util.Bytes;
+import org.apache.hadoop.hbase.util.PositionedByteRange;
+import org.apache.hadoop.hbase.util.SimplePositionedByteRange;
 import org.apache.phoenix.hbase.index.util.KeyValueBuilder;
 import org.apache.phoenix.query.QueryConstants;
 import org.apache.phoenix.schema.ColumnNotFoundException;
@@ -81,7 +85,8 @@ public class IndexTestUtil {
         SortOrder indexModifier = indexColumn.getSortOrder();
         // We know ordinal position will match pk position, because you cannot
         // alter an index table.
-        indexType.coerceBytes(ptr, dataType, dataModifier, indexModifier);
+//        indexType.coerceBytes(ptr, dataType, dataModifier, indexModifier);
+        indexType.coerceRowBytes(ptr, dataType, dataModifier, indexModifier);
     }
     
     public static List<Mutation> generateIndexData(PTable index, PTable table,
@@ -118,6 +123,7 @@ public class IndexTestUtil {
         Boolean hasValue;
         // Skip salt column
         int maxOffset = dataRowKey.length;
+        // TODO this updates the ptr to have the data row key, but len is wrong.
         dataRowKeySchema.iterator(dataRowKey, ptr, dataTable.getBucketNum() == null ? i : ++i);
         List<PColumn> indexPKColumns = indexTable.getPKColumns();
         List<PColumn> indexColumns = indexTable.getColumns();
@@ -125,12 +131,23 @@ public class IndexTestUtil {
         int maxIndexValues = indexColumns.size() - nIndexColumns - indexOffset;
         BitSet indexValuesSet = new BitSet(maxIndexValues);
         byte[][] indexValues = new byte[indexColumns.size() - indexOffset][];
-        while ((hasValue = dataRowKeySchema.next(ptr, i, maxOffset)) != null) {
-            if (hasValue) {
+
+        // TODO need to use KSTruct to parse this, not this row key schema iterator.
+        Iterator<Object> iter = dataRowKeySchema.iteratorFor(ptr.get(), ptr.getOffset(), ptr.getLength());
+        while (iter.hasNext()) {
+            Object v = iter.next();
+//        while ((hasValue = dataRowKeySchema.next(ptr, i, maxOffset)) != null) {
+            if (v != null) {
                 PColumn dataColumn = dataPKColumns.get(i);
                 PColumn indexColumn = indexTable.getColumn(IndexUtil.getIndexColumnName(dataColumn));
-                coerceDataValueToIndexValue(dataColumn, indexColumn, ptr);
-                indexValues[indexColumn.getPosition()-indexOffset] = ptr.copyBytes();
+                // jmhsieh need to use column encoding as opposed to value encoding.
+                // coerceDataValueToIndexValue(dataColumn, indexColumn, ptr);
+                DataType idxFieldType = indexColumn.getDataType().getHDataType();
+                int sz = idxFieldType.encode(null, v);
+                byte[] buf = new byte[sz];
+                PositionedByteRange pbr = new SimplePositionedByteRange(buf);
+                idxFieldType.encode(pbr, v);
+                indexValues[indexColumn.getPosition()-indexOffset] = buf;
             }
             i++;
         }
@@ -164,6 +181,7 @@ public class IndexTestUtil {
                     }
                 }
             }
+            // TODO check -- is does this use the new encoder
             indexTable.newKey(ptr, indexValues);
             row = indexTable.newRow(builder, ts, ptr);
             int pos = 0;

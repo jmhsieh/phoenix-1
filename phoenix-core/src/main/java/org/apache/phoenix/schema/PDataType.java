@@ -7074,7 +7074,19 @@ public enum PDataType {
     	return bytes;
     }
 
-    public void coerceBytes(ImmutableBytesWritable ptr, Object o, PDataType actualType, 
+    /**
+     *
+     * @param ptr source pointer and destination pointer
+     * @param o
+     * @param actualType
+     * @param actualMaxLength
+     * @param actualScale
+     * @param actualModifier
+     * @param desiredMaxLength
+     * @param desiredScale
+     * @param expectedModifier
+     */
+    public void coerceBytes(ImmutableBytesWritable ptr, Object o, PDataType actualType,
             Integer actualMaxLength, Integer actualScale, SortOrder actualModifier,
             Integer desiredMaxLength, Integer desiredScale, SortOrder expectedModifier) {
         Preconditions.checkNotNull(actualModifier);
@@ -7109,6 +7121,50 @@ public enum PDataType {
     public final void coerceBytes(ImmutableBytesWritable ptr, PDataType actualType, SortOrder actualModifier,
             SortOrder expectedModifier, Integer desiredMaxLength) {
         coerceBytes(ptr, null, actualType, null, null, actualModifier, desiredMaxLength, null, expectedModifier);
+    }
+
+    /**
+     * This translates from source hdatatype to dest hdatatype.
+     * @param ptr
+     * @param actualType
+     * @param actualModifier
+     * @param expectedModifier
+     */
+    public void coerceRowBytes(ImmutableBytesWritable ptr, PDataType actualType, SortOrder actualModifier, SortOrder expectedModifier) {
+        Preconditions.checkNotNull(actualModifier);
+        Preconditions.checkNotNull(expectedModifier);
+        if (ptr.getLength() == 0) {
+            return;
+        }
+        if (this.isBytesComparableWith(actualType)) { // No coerce necessary
+            if (actualModifier == expectedModifier) {
+                return;
+            }
+            byte[] b = ptr.copyBytes();
+            SortOrder.invert(b, 0, b, 0, b.length);
+            ptr.set(b);
+            return;
+        }
+
+        // Optimization for cases in which we already have the object around
+        Object o = null;
+        if (o == null) {
+            //o = actualType.toObject(ptr, actualType, actualModifier);
+
+            // for now we'll do the dumb thing -- convert back to original value
+            //DataType idx = indexType.getHDataType();
+            DataType rowFieldType = actualType.getHDataType();
+            PositionedByteRange pbr = new SimplePositionedByteRange(ptr.get(), ptr.getOffset(), ptr.getSize());
+            o = rowFieldType.decode(pbr);
+        }
+        o = toObject(o, actualType);
+
+        DataType idxFieldType = getHDataType();
+        int sz = idxFieldType.encode(null, o);
+        byte[] buf = new byte[sz];
+        PositionedByteRange pbr = new SimplePositionedByteRange(buf);
+        idxFieldType.encode(pbr, buf);
+        ptr.set(buf);
     }
 
     private static Void throwConstraintViolationException(PDataType source, PDataType target) {
