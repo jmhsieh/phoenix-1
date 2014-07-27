@@ -335,7 +335,7 @@ public enum PDataType {
 
         @Override
         public DataType getHDataType() {
-            return OrderedRawInt8.ASCENDING;
+            return new KRawString();
         }
 
     },
