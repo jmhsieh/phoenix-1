@@ -21,6 +21,7 @@ import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.Iterator;
 import java.util.List;
 
 import org.apache.hadoop.hbase.Cell;
@@ -154,7 +155,13 @@ public class SkipScanFilter extends FilterBase implements Writable {
         isDone = false;
         int startPos = 0;
         int lastSlot = slots.size()-1;
+        // is the lowerInclusive after the highest possible slots?
         if (!lowerUnbound) {
+            // jmhsieh: todo replace both of these next() calls.
+
+            // Iterator<Object> it = schema.iteratorFor(lowerInclusiveKey, 0, lowerInclusiveKey.length);
+            // it.next();
+
             // Find the position of the first slot of the lower range
             schema.next(ptr, 0, schema.iterator(lowerInclusiveKey,ptr));
             startPos = ScanUtil.searchClosestKeyRangeWithUpperHigherThanPtr(slots.get(0), ptr, 0);
@@ -163,11 +170,12 @@ public class SkipScanFilter extends FilterBase implements Writable {
                 return false;
             }
         }
+        // is the upperExclusive before the lowest possible slots?
         boolean upperUnbound = (upperExclusiveKey.length == 0);
         int endPos = slots.get(0).size()-1;
         if (!upperUnbound) {
             // Find the position of the first slot of the upper range
-            schema.next(ptr, 0, schema.iterator(upperExclusiveKey,ptr));
+            schema.next(ptr, 0, schema.iterator(upperExclusiveKey,ptr));  // these are the raw keys!
             endPos = ScanUtil.searchClosestKeyRangeWithUpperHigherThanPtr(slots.get(0), ptr, startPos);
             // Upper range lower than first lower range of first slot, so cannot possibly be in range
             if (endPos == 0 && Bytes.compareTo(upperExclusiveKey, slots.get(0).get(0).getLowerRange()) <= 0) {
@@ -284,6 +292,7 @@ public class SkipScanFilter extends FilterBase implements Writable {
         boolean seek = false;
         int earliestRangeIndex = nSlots-1;
         int minOffset = offset;
+        // so here is where we differ from the original (ptr.length comes out 2 instead of 0)
         int maxOffset = schema.iterator(currentKey, minOffset, length, ptr);
         schema.next(ptr, i, maxOffset);
         while (true) {

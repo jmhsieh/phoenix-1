@@ -44,12 +44,11 @@ import org.apache.phoenix.query.QueryConstants;
  * @since 0.1
  */
 public class RowKeySchema extends ValueSchema {
-    public static final RowKeySchema EMPTY_SCHEMA = new RowKeySchema(0,Collections.<Field>emptyList())
-    ;
-    
+    public static final RowKeySchema EMPTY_SCHEMA = new RowKeySchema(0, Collections.<Field>emptyList());
+
     public RowKeySchema() {
     }
-    
+
     protected RowKeySchema(int minNullable, List<Field> fields) {
         super(minNullable, fields);
     }
@@ -59,7 +58,7 @@ public class RowKeySchema extends ValueSchema {
             super(maxFields);
             setMaxFields(maxFields);
         }
-        
+
         @Override
         public RowKeySchemaBuilder addField(PDatum datum, boolean isNullable, SortOrder sortOrder) {
             super.addField(datum, isNullable, sortOrder);
@@ -79,21 +78,24 @@ public class RowKeySchema extends ValueSchema {
 
     /**
      * Gets the position'th field of the rowkey from the src buffer
-     * @param src buffer
+     *
+     * @param src       buffer
      * @param srcOffset source starting offset
      * @param srcLength source max len from offset (TODO make sure srcOffset+srcLength < src.length)
-     * @param ptr return value pointer set to the last point read.
-     * @param position start from this position in the schema struct
+     * @param ptr       return value pointer set to the last point read.
+     * @param position  start from this position in the schema struct
      * @return true if has value, false if no values, null if (?) out of range
-     *
+     * <p/>
      * TODO need to just dep
      */
     @edu.umd.cs.findbugs.annotations.SuppressWarnings(
-            value="NP_BOOLEAN_RETURN_NULL", 
-            justification="Designed to return null.")
+            value = "NP_BOOLEAN_RETURN_NULL",
+            justification = "Designed to return null.")
     public Boolean iterator(byte[] src, int srcOffset, int srcLength, ImmutableBytesWritable ptr, int position) {
         Boolean hasValue = null;
-        ptr.set(src, srcOffset, srcLength); // Why was this 0?  that is just wrong!
+        // originally, this was 0.  This is because the old the ptr would be incremented by the next call.
+        //ptr.set(src, srcOffset, srcLength); // Why was this 0?  that is just wrong!
+        ptr.set(src, srcOffset, 0);
         int maxOffset = srcOffset + srcLength;
         for (int i = 0; i < position; i++) {
             hasValue = next(ptr, i, maxOffset);
@@ -103,8 +105,9 @@ public class RowKeySchema extends ValueSchema {
 
     /**
      * Gets the position'th field of the rowkey from the src buffer
-     * @param srcPtr src pointer
-     * @param ptr return value pointer set to the last point read.
+     *
+     * @param srcPtr   src pointer
+     * @param ptr      return value pointer set to the last point read.
      * @param position start from this position in the schema struct
      * @return true if has value, false if no values, null if (?) out of range
      */
@@ -114,8 +117,9 @@ public class RowKeySchema extends ValueSchema {
 
     /**
      * Gets the position'th field of the rowkey from the src buffer
-     * @param src src buffer
-     * @param ptr return value pointer set to the last point read.
+     *
+     * @param src      src buffer
+     * @param ptr      return value pointer set to the last point read.
      * @param position start from this position in the schema struct
      * @return true if has value, false if no values, null if (?) out of range
      */
@@ -137,16 +141,17 @@ public class RowKeySchema extends ValueSchema {
 
     /**
      * Move the bytes ptr to the next position relative to the current ptr
-     * @param ptr bytes pointer pointing to the value at the positional index
-     * provided.
-     * @param position zero-based index of the next field in the value schema
+     *
+     * @param ptr       bytes pointer pointing to the value at the positional index
+     *                  provided.
+     * @param position  zero-based index of the next field in the value schema
      * @param maxOffset max possible offset value when iterating
      * @return true if a value was found and ptr was set, false if the value is null and ptr was not
      * set, and null if the value is null and there are no more values
-      */
+     */
     @edu.umd.cs.findbugs.annotations.SuppressWarnings(
-            value="NP_BOOLEAN_RETURN_NULL", 
-            justification="Designed to return null.")
+            value = "NP_BOOLEAN_RETURN_NULL",
+            justification = "Designed to return null.")
     @Deprecated // this assumes null separated rowkey, we now use KStruct to generate row keys.
     public Boolean next(ImmutableBytesWritable ptr, int position, int maxOffset) {
         if (ptr.getOffset() + ptr.getLength() >= maxOffset) {
@@ -162,14 +167,14 @@ public class RowKeySchema extends ValueSchema {
         ptr.set(ptr.get(), ptr.getOffset() + ptr.getLength(), 0);
 
         // If positioned at SEPARATOR_BYTE, skip it.
-        if (position > 0 && !getField(position-1).getDataType().isFixedWidth()) {
-            ptr.set(ptr.get(), ptr.getOffset()+ptr.getLength()+1, 0);
+        if (position > 0 && !getField(position - 1).getDataType().isFixedWidth()) {
+            ptr.set(ptr.get(), ptr.getOffset() + ptr.getLength() + 1, 0);
         }
         Field field = this.getField(position);
         if (field.getDataType().isFixedWidth()) {
-            ptr.set(ptr.get(),ptr.getOffset(), field.getByteSize());
+            ptr.set(ptr.get(), ptr.getOffset(), field.getByteSize());
         } else {
-            if (position+1 == getFieldCount() ) { // Last field has no terminator
+            if (position + 1 == getFieldCount()) { // Last field has no terminator
                 ptr.set(ptr.get(), ptr.getOffset(), maxOffset - ptr.getOffset());
             } else {
                 byte[] buf = ptr.get();
@@ -186,21 +191,22 @@ public class RowKeySchema extends ValueSchema {
 
     /**
      * Only used by reposition, which is only usd by skip scan filter
+     *
      * @param ptr
      * @param position
      * @param minOffset
      * @return
      */
     @edu.umd.cs.findbugs.annotations.SuppressWarnings(
-            value="NP_BOOLEAN_RETURN_NULL", 
-            justification="Designed to return null.")
+            value = "NP_BOOLEAN_RETURN_NULL",
+            justification = "Designed to return null.")
     public Boolean previous(ImmutableBytesWritable ptr, int position, int minOffset) {
         if (position < 0) {
             return null;
         }
         Field field = this.getField(position);
         if (field.getDataType().isFixedWidth()) {
-            ptr.set(ptr.get(), ptr.getOffset()-field.getByteSize(), field.getByteSize());
+            ptr.set(ptr.get(), ptr.getOffset() - field.getByteSize(), field.getByteSize());
             return true;
         }
         // If ptr has length of zero, it is assumed that we're at the end of the row key
@@ -209,41 +215,42 @@ public class RowKeySchema extends ValueSchema {
             ptr.set(ptr.get(), minOffset, ptr.getOffset() - minOffset - offsetAdjustment);
             return true;
         }
-        field = this.getField(position-1);
+        field = this.getField(position - 1);
         // Field before the one we want to position at is variable length
         // In this case, we can search backwards for our separator byte
         // to determine the length
         if (!field.getDataType().isFixedWidth()) {
             byte[] buf = ptr.get();
-            int offset = ptr.getOffset()-1-offsetAdjustment;
+            int offset = ptr.getOffset() - 1 - offsetAdjustment;
             while (offset > minOffset /* sanity check*/ && buf[offset] != QueryConstants.SEPARATOR_BYTE) {
                 offset--;
             }
             if (offset == minOffset) { // shouldn't happen
-                ptr.set(buf, minOffset, ptr.getOffset()-minOffset-1);
+                ptr.set(buf, minOffset, ptr.getOffset() - minOffset - 1);
             } else {
-                ptr.set(buf,offset+1,ptr.getOffset()-1-offsetAdjustment-offset); // Don't include null terminator in length
+                ptr.set(buf, offset + 1, ptr.getOffset() - 1 - offsetAdjustment - offset); // Don't include null terminator in length
             }
             return true;
         }
-        int i,fixedOffset = field.getByteSize();
-        for (i = position-2; i >= 0 && this.getField(i).getDataType().isFixedWidth(); i--) {
+        int i, fixedOffset = field.getByteSize();
+        for (i = position - 2; i >= 0 && this.getField(i).getDataType().isFixedWidth(); i--) {
             fixedOffset += this.getField(i).getByteSize();
         }
         // All of the previous fields are fixed width, so we can calculate the offset
         // based on the total fixed offset
         if (i < 0) {
             int length = ptr.getOffset() - fixedOffset - minOffset - offsetAdjustment;
-            ptr.set(ptr.get(),minOffset+fixedOffset, length);
+            ptr.set(ptr.get(), minOffset + fixedOffset, length);
             return true;
         }
         // Otherwise we're stuck with starting from the minOffset and working all the way forward,
         // because we can't infer the length of the previous position.
-        return iterator(ptr.get(), minOffset, ptr.getOffset() - minOffset - offsetAdjustment, ptr, position+1);
+        return iterator(ptr.get(), minOffset, ptr.getOffset() - minOffset - offsetAdjustment, ptr, position + 1);
     }
 
     /**
      * Only used by skip scan filter
+     *
      * @param ptr
      * @param oldPosition
      * @param newPosition
@@ -252,8 +259,8 @@ public class RowKeySchema extends ValueSchema {
      * @return
      */
     @edu.umd.cs.findbugs.annotations.SuppressWarnings(
-            value="NP_BOOLEAN_RETURN_NULL", 
-            justification="Designed to return null.")
+            value = "NP_BOOLEAN_RETURN_NULL",
+            justification = "Designed to return null.")
     public Boolean reposition(ImmutableBytesWritable ptr, int oldPosition, int newPosition, int minOffset, int maxOffset) {
         if (newPosition == oldPosition) {
             return ptr.getLength() > 0;
@@ -262,7 +269,7 @@ public class RowKeySchema extends ValueSchema {
         if (newPosition > oldPosition) {
             do {
                 hasValue = next(ptr, ++oldPosition, maxOffset);
-            }  while (hasValue != null && oldPosition < newPosition) ;
+            } while (hasValue != null && oldPosition < newPosition);
         } else {
             int nVarLengthFromBeginning = 0;
             for (int i = 0; i <= newPosition; i++) {
@@ -277,18 +284,19 @@ public class RowKeySchema extends ValueSchema {
                 }
             }
             if (nVarLengthBetween > nVarLengthFromBeginning) {
-                return iterator(ptr.get(), minOffset, maxOffset-minOffset, ptr, newPosition+1);
+                return iterator(ptr.get(), minOffset, maxOffset - minOffset, ptr, newPosition + 1);
             }
-            do  {
+            do {
                 hasValue = previous(ptr, --oldPosition, minOffset);
             } while (hasValue != null && oldPosition > newPosition);
         }
-        
+
         return hasValue;
     }
 
     /**
      * Creates a java-style iterator to march through translating an encoded rowkey.  The iterator is not thread safe.
+     *
      * @param buf
      * @param off
      * @param len
@@ -303,7 +311,7 @@ public class RowKeySchema extends ValueSchema {
 
             {
                 KStructBuilder builder = new KStructBuilder();
-                for (int i=0; i < schema.getFieldCount(); i++) {
+                for (int i = 0; i < schema.getFieldCount(); i++) {
                     Field f = schema.getField(i);
                     builder.add(f.getDataType().getHDataType());
                 }
@@ -331,8 +339,52 @@ public class RowKeySchema extends ValueSchema {
 
             @Override
             public void remove() {
-                throw  new UnsupportedOperationException("Row Key iterator does not support remove()");
+                throw new UnsupportedOperationException("Row Key iterator does not support remove()");
             }
         };
+    }
+
+    /**
+     * Uses the KStruct to generate pointers
+     *
+     * @param ptr
+     * @param position
+     * @param maxOffset
+     * @return
+     */
+    public Boolean nextFor(ImmutableBytesWritable ptr, int position, int maxOffset) {
+        if (ptr.getOffset() + ptr.getLength() >= maxOffset) {
+            ptr.set(ptr.get(), maxOffset, 0);
+            return null;
+        }
+        if (position >= getFieldCount()) {
+            return null;
+        }
+        // Move the pointer past the current value and set length
+        // to 0 to ensure you never set the ptr past the end of the
+        // backing byte array.
+        ptr.set(ptr.get(), ptr.getOffset() + ptr.getLength(), 0);
+
+        // TODO: jmhsieh we change this here, since we no use SEPARATOR_BYTE, need KStruct internals
+        // If positioned at SEPARATOR_BYTE, skip it.
+        //if (position > 0 && !getField(position - 1).getDataType().isFixedWidth()) {
+        //   ptr.set(ptr.get(), ptr.getOffset() + ptr.getLength() + 1, 0);
+        //}
+        Field field = this.getField(position);
+        if (field.getDataType().isFixedWidth()) {
+            ptr.set(ptr.get(), ptr.getOffset(), field.getByteSize());
+        } else {
+            if (position + 1 == getFieldCount()) { // Last field has no terminator
+                ptr.set(ptr.get(), ptr.getOffset(), maxOffset - ptr.getOffset());
+            } else {
+                byte[] buf = ptr.get();
+                int offset = ptr.getOffset();
+                while (offset < maxOffset && buf[offset] != SEPARATOR_BYTE) {
+                    offset++;
+                }
+                ptr.set(buf, ptr.getOffset(), offset - ptr.getOffset());
+            }
+        }
+        return ptr.getLength() > 0;
     }
 }

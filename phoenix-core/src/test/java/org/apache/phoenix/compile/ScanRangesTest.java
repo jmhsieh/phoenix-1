@@ -40,6 +40,8 @@ import com.google.common.collect.Lists;
 
 /**
  * Test for intersect method in {@link ScanRanges}
+ *
+ * ScanRanges has baked in info about key formats.  doh.
  */
 @RunWith(Parameterized.class)
 public class ScanRangesTest {
